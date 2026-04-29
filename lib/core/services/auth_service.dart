@@ -40,15 +40,4 @@ class AuthService {
     return response.statusCode == 200;
   }
 
-  static Future<bool> hasClientData(int userId) async {
-    final response = await http.get(
-      Uri.parse("http://astrhoapp.somee.com/api/Clientes"),
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body) as List;
-      return data.any((client) => client['usuarioId'] == userId);
-    }
-    return false;
-  }
 }

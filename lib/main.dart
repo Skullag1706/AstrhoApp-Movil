@@ -7,7 +7,6 @@ import 'auth/screens/register_page.dart';
 import 'auth/screens/forgot_password_page.dart';
 import 'auth/screens/confirm_code_page.dart';
 import 'auth/screens/reset_password_page.dart';
-import 'auth/screens/client_form_page.dart';
 import 'auth/screens/home_page.dart';
 import 'auth/screens/admin_page.dart';
 import 'auth/screens/assistant_page.dart';
@@ -60,7 +59,6 @@ class MyApp extends StatelessWidget {
         '/forgot-password': (_) => ForgotPasswordPage(),
         '/confirm-code': (_) => ConfirmCodePage(),
         '/reset-password': (_) => ResetPasswordPage(),
-        '/client-form': (_) => ClientFormPage(),
 
         // ROLES
         '/home': (_) => HomePage(),
