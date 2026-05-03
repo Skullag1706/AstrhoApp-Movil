@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:astrhoapp/core/services/auth_service.dart';
 
 class ResetPasswordPage extends StatefulWidget {
+  const ResetPasswordPage({super.key});
+
   @override
   _ResetPasswordPageState createState() => _ResetPasswordPageState();
 }

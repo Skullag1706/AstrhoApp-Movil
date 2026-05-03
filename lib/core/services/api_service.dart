@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import '/agenda/models/agenda.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://astrhoapp.somee.com/api';
+  static const String baseUrl = 'http://www.astrhoapp.somee.com/api';
   static const Duration timeoutDuration = Duration(seconds: 30);
 
   final String? token;
@@ -47,88 +47,93 @@ class ApiService {
     try {
       final response = await http
           .get(Uri.parse('$baseUrl/Agenda'), headers: _headers)
-          .timeout(
-            timeoutDuration,
-            onTimeout: () {
-              throw Exception('Tiempo de espera agotado al cargar las citas');
-            },
-          );
+          .timeout(timeoutDuration);
 
       if (response.statusCode == 200) {
-        final body = response.body.trim();
-        if (body.isEmpty) {
-          return [];
-        }
+        return _parseAgendaList(response.body);
+      }
+      return [];
+    } catch (e) {
+      print('Excepción al obtener todas las citas: $e');
+      return [];
+    }
+  }
 
-        try {
-          final dynamic data = _parseJson(body);
+  // Obtener citas del cliente logueado
+  Future<List<Agenda>> getMisCitas() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/Agenda/mis-citas'), headers: _headers)
+          .timeout(timeoutDuration);
 
-          // Si la respuesta es una lista directamente
-          if (data is List) {
-            return data
-                .map((item) {
-                  if (item is Map<String, dynamic>) {
-                    try {
-                      return Agenda.fromJson(item);
-                    } catch (e) {
-                      return null;
-                    }
-                  } else {
-                    return null;
-                  }
-                })
-                .where(
-                  (agenda) =>
-                      agenda != null && agenda.documentoCliente.isNotEmpty,
-                )
-                .cast<Agenda>()
-                .toList();
-          }
-          // Si la respuesta es un objeto con una propiedad que contiene la lista
-          else if (data is Map<String, dynamic>) {
-            // Intentar encontrar una propiedad que sea una lista
-            for (var key in data.keys) {
-              if (data[key] is List) {
-                return (data[key] as List)
-                    .map((item) {
-                      if (item is Map<String, dynamic>) {
-                        try {
-                          return Agenda.fromJson(item);
-                        } catch (e) {
-                          return null;
-                        }
-                      }
-                      return null;
-                    })
-                    .where(
-                      (agenda) =>
-                          agenda != null && agenda.documentoCliente.isNotEmpty,
-                    )
-                    .cast<Agenda>()
-                    .toList();
-              }
-            }
-            // Si no hay lista, devolver vacío
-            return [];
-          }
-          // Si la respuesta es un String (mensaje de error)
-          else if (data is String) {
-            // Si es un mensaje de error, devolver lista vacía
-            return [];
-          }
-          return [];
-        } catch (parseError) {
-          // Si falla el parseo, puede ser que la respuesta sea un mensaje de error
-          // Devolver lista vacía en lugar de fallar
-          return [];
-        }
+      if (response.statusCode == 200) {
+        return _parseAgendaList(response.body);
       } else {
-        // Si el status code no es 200, devolver lista vacía en lugar de lanzar excepción
+        print('Error en mis-citas: ${response.statusCode} - ${response.body}');
         return [];
       }
     } catch (e) {
-      // En caso de cualquier error, devolver lista vacía
+      print('Excepción en mis-citas: $e');
       return [];
+    }
+  }
+
+  List<Agenda> _parseAgendaList(String body) {
+    if (body.trim().isEmpty) return [];
+    try {
+      final dynamic data = _parseJson(body);
+      List<dynamic> list = [];
+      if (data is List) {
+        list = data;
+      } else if (data is Map<String, dynamic>) {
+        if (data.containsKey('data') && data['data'] is List) {
+          list = data['data'];
+        } else if (data.containsKey('items') && data['items'] is List) {
+          list = data['items'];
+        } else {
+          for (var value in data.values) {
+            if (value is List) {
+              list = value;
+              break;
+            }
+          }
+        }
+      }
+      return list
+          .map((item) {
+            if (item is Map<String, dynamic>) {
+              try {
+                return Agenda.fromJson(item);
+              } catch (e) {
+                print('Error al parsear una cita: $e');
+                return null;
+              }
+            }
+            return null;
+          })
+          .where((agenda) => agenda != null)
+          .cast<Agenda>()
+          .toList();
+    } catch (e) {
+      print('Error parseando lista de agendas: $e');
+      return [];
+    }
+  }
+
+  // Buscar cliente por usuario ID (para autocompletar formularios)
+  Future<Cliente?> getClientePorUsuarioId(int userId) async {
+    try {
+      final clientes = await getClientes();
+      if (clientes.isNotEmpty) {
+        return clientes.firstWhere(
+          (c) => c.usuarioId == userId,
+          orElse: () => throw Exception('Cliente no encontrado'),
+        );
+      }
+      return null;
+    } catch (e) {
+      print("Error buscando cliente por ID: $e");
+      return null;
     }
   }
 
@@ -260,7 +265,7 @@ class ApiService {
         );
       }
     } catch (e) {
-      throw e;
+      rethrow;
     }
   }
 
@@ -518,408 +523,290 @@ class ApiService {
   // Obtener servicios
   Future<List<Servicio>> getServicios() async {
     try {
+      // Intentar primero con la ruta plural
       final response = await http
-          .get(Uri.parse('$baseUrl/Servicio'), headers: _headers)
+          .get(Uri.parse('$baseUrl/Servicios'), headers: _headers)
           .timeout(timeoutDuration);
 
+      print('Intentando endpoint: $baseUrl/Servicios');
+      print('Respuesta servicios status: ${response.statusCode}');
+      print('Respuesta servicios body: ${response.body}');
+
       if (response.statusCode == 200) {
-        final body = response.body.trim();
-        if (body.isEmpty) {
-          print('Respuesta de servicios vacía');
-          return [];
-        }
-        try {
-          final dynamic data = _parseJson(body);
-          if (data is List) {
-            final servicios = data
-                .map((json) {
-                  try {
-                    return Servicio.fromJson(json as Map<String, dynamic>);
-                  } catch (e) {
-                    print('Error al parsear servicio: $e');
-                    return null;
-                  }
-                })
-                .where((s) => s != null)
-                .cast<Servicio>()
-                .toList();
-            print('Servicios cargados: ${servicios.length}');
-            return servicios;
-          } else if (data is Map<String, dynamic>) {
-            for (var key in data.keys) {
-              if (data[key] is List) {
-                final servicios = (data[key] as List)
-                    .map((json) {
-                      try {
-                        return Servicio.fromJson(json as Map<String, dynamic>);
-                      } catch (e) {
-                        print('Error al parsear servicio: $e');
-                        return null;
-                      }
-                    })
-                    .where((s) => s != null)
-                    .cast<Servicio>()
-                    .toList();
-                print('Servicios cargados: ${servicios.length}');
-                return servicios;
-              }
-            }
-            print('No se encontró lista de servicios en la respuesta');
-            return [];
-          }
-          print('Formato de respuesta inesperado para servicios');
-          return [];
-        } catch (parseError) {
-          print('Error al parsear servicios: $parseError');
-          // Intentar con ruta alternativa (plural)
-          try {
-            final responseAlt = await http
-                .get(Uri.parse('$baseUrl/Servicios'))
-                .timeout(timeoutDuration);
-            if (responseAlt.statusCode == 200) {
-              final body = responseAlt.body.trim();
-              if (body.isEmpty) return [];
-              final dynamic data = _parseJson(body);
-              if (data is List) {
-                return data
-                    .map((json) {
-                      try {
-                        return Servicio.fromJson(json as Map<String, dynamic>);
-                      } catch (e) {
-                        return null;
-                      }
-                    })
-                    .where((s) => s != null)
-                    .cast<Servicio>()
-                    .toList();
-              }
-            }
-          } catch (e) {
-            print('Error al obtener servicios (ruta alternativa): $e');
-          }
-          return [];
-        }
+        return _parseServicioList(response.body);
       } else if (response.statusCode == 404) {
-        // Intentar con ruta alternativa (plural)
-        try {
-          final responseAlt = await http
-              .get(Uri.parse('$baseUrl/Servicios'))
-              .timeout(timeoutDuration);
-          if (responseAlt.statusCode == 200) {
-            final body = responseAlt.body.trim();
-            if (body.isEmpty) return [];
-            final dynamic data = _parseJson(body);
-            if (data is List) {
-              return data
-                  .map((json) {
-                    try {
-                      return Servicio.fromJson(json as Map<String, dynamic>);
-                    } catch (e) {
-                      return null;
-                    }
-                  })
-                  .where((s) => s != null)
-                  .cast<Servicio>()
-                  .toList();
-            }
-          }
-        } catch (e) {
-          print('Error al obtener servicios (ruta alternativa): $e');
+        // Intentar con ruta singular
+        final responseSingular = await http
+            .get(Uri.parse('$baseUrl/Servicio'), headers: _headers)
+            .timeout(timeoutDuration);
+        print('Intentando endpoint singular: $baseUrl/Servicio');
+        print('Respuesta singular status: ${responseSingular.statusCode}');
+        if (responseSingular.statusCode == 200) {
+          return _parseServicioList(responseSingular.body);
         }
-        print('Error 404 al obtener servicios');
-        return [];
-      } else {
-        print(
-          'Error al obtener servicios: ${response.statusCode} - ${response.body}',
-        );
-        return [];
       }
+      return [];
     } catch (e) {
       print('Excepción al obtener servicios: $e');
       return [];
     }
   }
 
-  // Obtener clientes
-  Future<List<Cliente>> getClientes() async {
+  List<Servicio> _parseServicioList(String body) {
+    if (body.trim().isEmpty) {
+      print('Cuerpo de servicios vacío');
+      return [];
+    }
     try {
+      final dynamic data = _parseJson(body);
+      List<dynamic> list = [];
+      if (data is List) {
+        list = data;
+      } else if (data is Map<String, dynamic>) {
+        if (data.containsKey('data') && data['data'] is List) {
+          list = data['data'];
+        } else if (data.containsKey('items') && data['items'] is List) {
+          list = data['items'];
+        } else {
+          for (var value in data.values) {
+            if (value is List) {
+              list = value;
+              break;
+            }
+          }
+        }
+      }
+      print('Lista de servicios para parsear: ${list.length} elementos');
+      final servicios = list
+          .map((json) {
+            try {
+              print('Parseando servicio: $json');
+              final servicio = Servicio.fromJson(json as Map<String, dynamic>);
+              print('Servicio parseado: ID=${servicio.servicioId}, Nombre=${servicio.nombre}, Precio=${servicio.precio}');
+              return servicio;
+            } catch (e) {
+              print('Error al parsear servicio individual: $e');
+              return null;
+            }
+          })
+          .where((s) => s != null)
+          .cast<Servicio>()
+          .toList();
+      print('Servicios parseados exitosamente: ${servicios.length}');
+      for (var s in servicios) {
+        print('  - ${s.servicioId}: ${s.nombre} - ${s.precio}');
+      }
+      return servicios;
+    } catch (e) {
+      print('Error general parseando lista de servicios: $e');
+      return [];
+    }
+  }
+
+  // Función para obtener TODOS los registros de una API con paginación
+  Future<List<dynamic>> fetchAllPaginated(String endpoint) async {
+    final List<dynamic> allItems = [];
+    int page = 1;
+    bool hasMore = true;
+    const int pageSize = 100;
+
+    while (hasMore) {
+      final url = Uri.parse('$baseUrl$endpoint?page=$page&pageSize=$pageSize');
+      print('Fetching: $url');
+
       final response = await http
-          .get(Uri.parse('$baseUrl/Cliente'), headers: _headers)
+          .get(url, headers: _headers)
           .timeout(timeoutDuration);
 
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
       if (response.statusCode == 200) {
-        final body = response.body.trim();
-        if (body.isEmpty) {
-          return [];
-        }
-        try {
-          final dynamic data = _parseJson(body);
-          if (data is List) {
-            return data
-                .map((json) {
-                  try {
-                    return Cliente.fromJson(json as Map<String, dynamic>);
-                  } catch (e) {
-                    // Si hay error al parsear un cliente, omitirlo
-                    return null;
-                  }
-                })
-                .where((c) => c != null)
-                .cast<Cliente>()
-                .toList();
-          } else if (data is Map<String, dynamic>) {
-            for (var key in data.keys) {
-              if (data[key] is List) {
-                return (data[key] as List)
-                    .map((json) {
-                      try {
-                        return Cliente.fromJson(json as Map<String, dynamic>);
-                      } catch (e) {
-                        return null;
-                      }
-                    })
-                    .where((c) => c != null)
-                    .cast<Cliente>()
-                    .toList();
-              }
-            }
-            return [];
-          }
-          return [];
-        } catch (parseError) {
-          // Si hay error al parsear, intentar con rutas alternativas
-          print('Error al parsear clientes: $parseError');
-          return [];
-        }
-      } else if (response.statusCode == 404) {
-        // Intentar con ruta alternativa (plural)
-        try {
-          final responseAlt = await http
-              .get(Uri.parse('$baseUrl/Clientes'))
-              .timeout(timeoutDuration);
-          if (responseAlt.statusCode == 200) {
-            final body = responseAlt.body.trim();
-            if (body.isEmpty) return [];
-            final dynamic data = _parseJson(body);
-            if (data is List) {
-              return data
-                  .map((json) {
-                    try {
-                      return Cliente.fromJson(json as Map<String, dynamic>);
-                    } catch (e) {
-                      return null;
-                    }
-                  })
-                  .where((c) => c != null)
-                  .cast<Cliente>()
-                  .toList();
+        final decoded = _parseJson(response.body);
+        List<dynamic> items = [];
+
+        if (decoded is List) {
+          items = decoded;
+        } else if (decoded is Map) {
+          print('Response keys: ${decoded.keys}');
+          
+          bool foundList = false;
+          for (var entry in decoded.entries) {
+            if (entry.value is List) {
+              items = entry.value as List<dynamic>;
+              print('Found list in key: ${entry.key}, items: ${items.length}');
+              foundList = true;
+              break;
             }
           }
-        } catch (e) {
-          print('Error al obtener clientes (ruta alternativa): $e');
+          
+          if (!foundList) {
+            print('No list found in response, treating as single item');
+            items = [decoded];
+          }
         }
-        return [];
+
+        print('Página $page: ${items.length} items');
+
+        if (items.isEmpty) {
+          print('No more items, stopping');
+          hasMore = false;
+        } else {
+          allItems.addAll(items);
+          page++;
+          
+          if (items.length < pageSize) {
+            print('Page has fewer items ($items.length) than pageSize ($pageSize), stopping');
+            hasMore = false;
+          } else {
+            print('Continuing to next page...');
+          }
+        }
       } else {
-        print(
-          'Error al obtener clientes: ${response.statusCode} - ${response.body}',
-        );
-        return [];
+        print('Error fetching page $page: ${response.statusCode}');
+        hasMore = false;
       }
+    }
+
+    print('Total items fetched from $endpoint: ${allItems.length}');
+    return allItems;
+  }
+
+  // Obtener clientes (todos los registros con paginación)
+  Future<List<Cliente>> getClientes() async {
+    try {
+      final clientesJson = await fetchAllPaginated('/Clientes');
+      return clientesJson
+          .map((json) {
+            try {
+              return Cliente.fromJson(json as Map<String, dynamic>);
+            } catch (e) {
+              return null;
+            }
+          })
+          .where((c) => c != null)
+          .cast<Cliente>()
+          .toList();
     } catch (e) {
       print('Excepción al obtener clientes: $e');
       return [];
     }
   }
 
-  // Obtener citas del cliente logueado
-  Future<List<Agenda>> getMisCitas() async {
+  List<Cliente> _parseClienteList(String body) {
+    if (body.trim().isEmpty) return [];
     try {
-      final response = await http
-          .get(Uri.parse('$baseUrl/Agenda/mis-citas'), headers: _headers)
-          .timeout(
-            timeoutDuration,
-            onTimeout: () {
-              throw Exception('Tiempo de espera agotado al cargar mis citas');
-            },
-          );
-
-      if (response.statusCode == 200) {
-        final body = response.body.trim();
-        if (body.isEmpty) {
-          return [];
-        }
-
-        try {
-          final dynamic data = _parseJson(body);
-
-          // Si la respuesta es una lista directamente
-          if (data is List) {
-            return data
-                .map((item) {
-                  if (item is Map<String, dynamic>) {
-                    try {
-                      return Agenda.fromJson(item);
-                    } catch (e) {
-                      return null;
-                    }
-                  } else {
-                    return null;
-                  }
-                })
-                .where((agenda) => agenda != null)
-                .cast<Agenda>()
-                .toList();
-          }
-          // Si la respuesta es un objeto con una propiedad que contiene la lista
-          else if (data is Map<String, dynamic>) {
-            // Intentar encontrar una propiedad que sea una lista
-            for (var key in data.keys) {
-              if (data[key] is List) {
-                return (data[key] as List)
-                    .map((item) {
-                      if (item is Map<String, dynamic>) {
-                        try {
-                          return Agenda.fromJson(item);
-                        } catch (e) {
-                          return null;
-                        }
-                      } else {
-                        return null;
-                      }
-                    })
-                    .where((agenda) => agenda != null)
-                    .cast<Agenda>()
-                    .toList();
-              }
+      final dynamic data = _parseJson(body);
+      List<dynamic> list = [];
+      if (data is List) {
+        list = data;
+      } else if (data is Map<String, dynamic>) {
+        // Buscar lista en propiedades comunes como 'data', 'items', 'values'
+        if (data.containsKey('data') && data['data'] is List) {
+          list = data['data'];
+        } else if (data.containsKey('items') && data['items'] is List) {
+          list = data['items'];
+        } else {
+          for (var value in data.values) {
+            if (value is List) {
+              list = value;
+              break;
             }
           }
-          return [];
-        } catch (e) {
-          throw Exception('Error al procesar los datos de mis citas: $e');
         }
-      } else {
-        throw Exception(
-          'Error al cargar mis citas: ${response.statusCode} - ${response.body}',
-        );
       }
+      return list
+          .map((json) {
+            try {
+              return Cliente.fromJson(json as Map<String, dynamic>);
+            } catch (e) {
+              return null;
+            }
+          })
+          .where((c) => c != null)
+          .cast<Cliente>()
+          .toList();
     } catch (e) {
-      throw Exception('Error de conexión: $e');
+      print('Error parseando lista de clientes: $e');
+      return [];
     }
   }
 
-  // Buscar cliente por usuario ID (para autocompletar formularios)
-  Future<Cliente?> getClientePorUsuarioId(int userId) async {
-    try {
-      // Intentamos usar el endpoint público que usa AuthService
-      final response = await http.get(Uri.parse('$baseUrl/Clientes'));
-
-      if (response.statusCode == 200) {
-        final body = response.body.trim();
-        final dynamic data = _parseJson(body);
-        if (data is List) {
-          final clienteData = data.firstWhere(
-            (c) => c['usuarioId'] == userId,
-            orElse: () => null,
-          );
-          if (clienteData != null) {
-            return Cliente.fromJson(clienteData);
-          }
-        }
-      }
-      return null;
-    } catch (e) {
-      print("Error buscando cliente por ID: $e");
-      return null;
-    }
-  }
-
-  // Obtener empleados
+  // Obtener empleados (todos los registros con paginación)
   Future<List<Empleado>> getEmpleados() async {
     try {
-      final response = await http
-          .get(Uri.parse('$baseUrl/Empleado'), headers: _headers)
-          .timeout(timeoutDuration);
-
-      if (response.statusCode == 200) {
-        final body = response.body.trim();
-        if (body.isEmpty) {
-          return [];
-        }
-        try {
-          final dynamic data = _parseJson(body);
-          if (data is List) {
-            return data
-                .map((json) {
-                  try {
-                    return Empleado.fromJson(json as Map<String, dynamic>);
-                  } catch (e) {
-                    // Si hay error al parsear un empleado, omitirlo
-                    return null;
-                  }
-                })
-                .where((e) => e != null)
-                .cast<Empleado>()
-                .toList();
-          } else if (data is Map<String, dynamic>) {
-            for (var key in data.keys) {
-              if (data[key] is List) {
-                return (data[key] as List)
-                    .map((json) {
-                      try {
-                        return Empleado.fromJson(json as Map<String, dynamic>);
-                      } catch (e) {
-                        return null;
-                      }
-                    })
-                    .where((e) => e != null)
-                    .cast<Empleado>()
-                    .toList();
-              }
+      final empleadosJson = await fetchAllPaginated('/Empleados');
+      return empleadosJson
+          .map((json) {
+            try {
+              return Empleado.fromJson(json as Map<String, dynamic>);
+            } catch (e) {
+              return null;
             }
-            return [];
-          }
-          return [];
-        } catch (parseError) {
-          // Si hay error al parsear, intentar con rutas alternativas
-          print('Error al parsear empleados: $parseError');
-          return [];
-        }
-      } else if (response.statusCode == 404) {
-        // Intentar con ruta alternativa (plural)
-        try {
-          final responseAlt = await http
-              .get(Uri.parse('$baseUrl/Empleados'))
-              .timeout(timeoutDuration);
-          if (responseAlt.statusCode == 200) {
-            final body = responseAlt.body.trim();
-            if (body.isEmpty) return [];
-            final dynamic data = _parseJson(body);
-            if (data is List) {
-              return data
-                  .map((json) {
-                    try {
-                      return Empleado.fromJson(json as Map<String, dynamic>);
-                    } catch (e) {
-                      return null;
-                    }
-                  })
-                  .where((e) => e != null)
-                  .cast<Empleado>()
-                  .toList();
-            }
-          }
-        } catch (e) {
-          print('Error al obtener empleados (ruta alternativa): $e');
-        }
-        return [];
-      } else {
-        print(
-          'Error al obtener empleados: ${response.statusCode} - ${response.body}',
-        );
-        return [];
-      }
+          })
+          .where((e) => e != null)
+          .cast<Empleado>()
+          .toList();
     } catch (e) {
       print('Excepción al obtener empleados: $e');
+      return [];
+    }
+  }
+
+  // Buscar empleado por usuario ID
+  Future<Empleado?> getEmpleadoPorUsuarioId(int userId) async {
+    try {
+      final empleados = await getEmpleados();
+      if (empleados.isNotEmpty) {
+        try {
+          return empleados.firstWhere(
+            (e) => e.usuarioId == userId,
+          );
+        } catch (_) {
+          return null;
+        }
+      }
+      return null;
+    } catch (e) {
+      print("Error buscando empleado por ID de usuario: $e");
+      return null;
+    }
+  }
+
+  List<Empleado> _parseEmpleadoList(String body) {
+    if (body.trim().isEmpty) return [];
+    try {
+      final dynamic data = _parseJson(body);
+      List<dynamic> list = [];
+      if (data is List) {
+        list = data;
+      } else if (data is Map<String, dynamic>) {
+        if (data.containsKey('data') && data['data'] is List) {
+          list = data['data'];
+        } else if (data.containsKey('items') && data['items'] is List) {
+          list = data['items'];
+        } else {
+          for (var value in data.values) {
+            if (value is List) {
+              list = value;
+              break;
+            }
+          }
+        }
+      }
+      return list
+          .map((json) {
+            try {
+              return Empleado.fromJson(json as Map<String, dynamic>);
+            } catch (e) {
+              return null;
+            }
+          })
+          .where((e) => e != null)
+          .cast<Empleado>()
+          .toList();
+    } catch (e) {
+      print('Error parseando lista de empleados: $e');
       return [];
     }
   }

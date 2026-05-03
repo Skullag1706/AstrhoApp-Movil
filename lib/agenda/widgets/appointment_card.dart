@@ -173,6 +173,51 @@ class AppointmentCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 4),
+                  if (agenda.nombreEmpleado != null &&
+                      agenda.nombreEmpleado!.isNotEmpty)
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.badge_outlined,
+                          size: 16,
+                          color: AppColors.primaryPurple,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Empleado: ${agenda.nombreEmpleado}',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: AppColors.textDark,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  if (agenda.nombreCliente != null &&
+                      agenda.nombreCliente!.isNotEmpty)
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.person_outline,
+                          size: 16,
+                          color: AppColors.primaryPurple,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Cliente: ${agenda.nombreCliente}',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: AppColors.textDark,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                 ],
               ),
             ),

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'profile_page.dart';
 
 class AsistentePage extends StatefulWidget {
+  const AsistentePage({super.key});
+
   @override
   _AsistentePageState createState() => _AsistentePageState();
 }
@@ -147,6 +150,18 @@ class _AsistentePageState extends State<AsistentePage> {
             text: "Gestión de Citas",
             onTap: () {
               Navigator.pushNamed(context, '/mis-citas', arguments: user);
+            },
+          ),
+          _drawerItem(
+            icon: Icons.person,
+            text: "Mi Perfil",
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProfilePage(user: user ?? {}),
+                ),
+              );
             },
           ),
           const Spacer(),

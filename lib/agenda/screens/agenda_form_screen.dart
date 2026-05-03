@@ -126,6 +126,36 @@ class _AgendaFormScreenState extends State<AgendaFormScreen> {
     try {
       _empleados = await _apiService.getEmpleados();
       print('Empleados cargados: ${_empleados.length}');
+
+      // Lógica para rol Empleado
+      if (_isEmployeeUser && widget.user!["usuarioId"] != null) {
+        final userId = widget.user!["usuarioId"];
+        final empleadoEncontrado = _empleados.firstWhere(
+          (e) => e.usuarioId == userId,
+          orElse: () => Empleado(documentoEmpleado: '', nombre: ''),
+        );
+
+        if (empleadoEncontrado.documentoEmpleado.isNotEmpty) {
+          _selectedEmpleado = empleadoEncontrado.documentoEmpleado;
+          // Opcionalmente limitamos la lista al propio empleado
+          _empleados = [empleadoEncontrado];
+          print("Empleado auto-asignado: ${empleadoEncontrado.nombre}");
+        } else {
+          // Intentar carga individual si no estaba en la lista
+          try {
+            final miEmpleado = await _apiService.getEmpleadoPorUsuarioId(userId);
+            if (miEmpleado != null) {
+              setState(() {
+                _empleados = [miEmpleado];
+                _selectedEmpleado = miEmpleado.documentoEmpleado;
+              });
+              print("Empleado cargado individualmente: ${miEmpleado.nombre}");
+            }
+          } catch (e) {
+            print("Error cargando empleado individual: $e");
+          }
+        }
+      }
     } catch (e) {
       print('Error al cargar empleados: $e');
       _empleados = [];
@@ -181,9 +211,7 @@ class _AgendaFormScreenState extends State<AgendaFormScreen> {
       } else {
         // Para clientes, si por alguna razón no se seteo el cliente (ej. fallo al cargar usuario),
         // aseguramos que tenga el de la agenda al menos.
-        if (_selectedCliente == null) {
-          _selectedCliente = widget.agenda!.documentoCliente;
-        }
+        _selectedCliente ??= widget.agenda!.documentoCliente;
       }
 
       // Verificar que el empleado existe en la lista
@@ -308,6 +336,19 @@ class _AgendaFormScreenState extends State<AgendaFormScreen> {
         widget.user!["rol"]?.toString().toLowerCase() == "cliente";
   }
 
+  bool get _isEmployeeUser {
+    return widget.user != null &&
+        widget.user!["rol"]?.toString().toLowerCase() == "empleado";
+  }
+
+  bool get _isAdminUser {
+    return widget.user != null &&
+        (widget.user!["rol"]?.toString().toLowerCase() == "administrador" ||
+         widget.user!["rol"]?.toString().toLowerCase() == "super admin" ||
+         widget.user!["rol"]?.toString().toLowerCase() == "superadmin" ||
+         widget.user!["rol"]?.toString().toLowerCase() == "super administrador");
+  }
+
   double get _totalCosto {
     return _serviciosDisponibles
         .where((s) => _serviciosSeleccionados.contains(s.servicioId))
@@ -361,12 +402,11 @@ class _AgendaFormScreenState extends State<AgendaFormScreen> {
 
     try {
       print(
-        'DEBUG Servicios disponibles: ' +
-            _serviciosDisponibles
+        'DEBUG Servicios disponibles: ${_serviciosDisponibles
                 .map((s) => 'id:${s.servicioId}, nombre:${s.nombre}')
-                .join(', '),
+                .join(', ')}',
       );
-      print('DEBUG IDs seleccionados: ' + _serviciosSeleccionados.join(', '));
+      print('DEBUG IDs seleccionados: ${_serviciosSeleccionados.join(', ')}');
       // Filtrar servicios seleccionados
       final serviciosSeleccionadosList = _serviciosDisponibles
           .where((s) => _serviciosSeleccionados.contains(s.servicioId))
@@ -704,7 +744,7 @@ class _AgendaFormScreenState extends State<AgendaFormScreen> {
                                         ),
                                       )
                                     : DropdownButtonFormField<String>(
-                                        value:
+                                        initialValue:
                                             _selectedCliente != null &&
                                                 _clientes.any(
                                                   (c) =>
@@ -751,7 +791,51 @@ class _AgendaFormScreenState extends State<AgendaFormScreen> {
                               // Empleado
                               _buildFormField(
                                 label: 'Empleado *',
-                                child: _empleados.isEmpty
+                                child: _isEmployeeUser
+                                    ? Container(
+                                        padding: const EdgeInsets.all(16),
+                                        width: double.infinity,
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
+                                            color: AppColors.textGray
+                                                .withOpacity(0.5),
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          color: Colors.grey[100],
+                                        ),
+                                        child: Text(
+                                          _selectedEmpleado != null
+                                              ? (_empleados.isNotEmpty
+                                                    ? _empleados
+                                                          .firstWhere(
+                                                            (e) =>
+                                                                e.documentoEmpleado ==
+                                                                _selectedEmpleado,
+                                                            orElse: () => Empleado(
+                                                              documentoEmpleado:
+                                                                  '',
+                                                              nombre:
+                                                                  widget
+                                                                      .agenda
+                                                                      ?.nombreEmpleado ??
+                                                                  'Empleado Actual',
+                                                            ),
+                                                          )
+                                                          .nombre
+                                                    : (widget
+                                                              .agenda
+                                                              ?.nombreEmpleado ??
+                                                          'Cargando...'))
+                                              : 'Cargando empleado...',
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                      )
+                                    : _empleados.isEmpty
                                     ? Container(
                                         padding: const EdgeInsets.all(16),
                                         decoration: BoxDecoration(
@@ -789,7 +873,7 @@ class _AgendaFormScreenState extends State<AgendaFormScreen> {
                                         ),
                                       )
                                     : DropdownButtonFormField<String>(
-                                        value:
+                                        initialValue:
                                             _selectedEmpleado != null &&
                                                 _empleados.any(
                                                   (e) =>
@@ -952,7 +1036,7 @@ class _AgendaFormScreenState extends State<AgendaFormScreen> {
                               _buildFormField(
                                 label: 'Método de Pago *',
                                 child: DropdownButtonFormField<int>(
-                                  value:
+                                  initialValue:
                                       _selectedMetodoPago != null &&
                                           _metodosPago.any(
                                             (m) =>
@@ -998,7 +1082,7 @@ class _AgendaFormScreenState extends State<AgendaFormScreen> {
                                 _buildFormField(
                                   label: 'Estado',
                                   child: DropdownButtonFormField<int>(
-                                    value: _selectedEstado,
+                                    initialValue: _selectedEstado,
                                     decoration: InputDecoration(
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),

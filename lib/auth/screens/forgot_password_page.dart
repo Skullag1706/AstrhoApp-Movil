@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:astrhoapp/core/services/auth_service.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
+  const ForgotPasswordPage({super.key});
+
   @override
   _ForgotPasswordPageState createState() => _ForgotPasswordPageState();
 }

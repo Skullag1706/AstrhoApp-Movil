@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
+
   @override
   _LoginPageState createState() => _LoginPageState();
 }
@@ -24,7 +26,7 @@ class _LoginPageState extends State<LoginPage> {
 
     setState(() => loading = true);
 
-    final url = Uri.parse("http://astrhoapp.somee.com/api/auth/login");
+    final url = Uri.parse("http://www.astrhoapp.somee.com/api/auth/login");
 
     try {
       print('DEBUG Login: Iniciando petición a $url');
@@ -54,7 +56,10 @@ class _LoginPageState extends State<LoginPage> {
         // RUTA POR DEFECTO
         String route = "/home";
 
-        if (rol == "administrador") {
+        if (rol == "administrador" || 
+            rol == "super admin" || 
+            rol == "superadmin" || 
+            rol == "super administrador") {
           route = "/admin";
         } else if (rol == "asistente") {
           route = "/assistant";

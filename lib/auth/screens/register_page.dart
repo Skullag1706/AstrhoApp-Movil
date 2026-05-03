@@ -10,7 +10,6 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
-  final nameController = TextEditingController();
   final emailController = TextEditingController();
   final confirmEmailController = TextEditingController();
   final passController = TextEditingController();
@@ -19,6 +18,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final documentoCtrl = TextEditingController();
   final nombreCtrl = TextEditingController();
   final telefonoCtrl = TextEditingController();
+  final direccionCtrl = TextEditingController();
   String? tipoDocumento;
   final List<String> tipoDocumentoOptions = ['CC', 'CE', 'TI', 'TE'];
 
@@ -26,25 +26,24 @@ class _RegisterPageState extends State<RegisterPage> {
   bool showConfirmPass = false;
   bool isLoading = false;
 
-  String? nameError;
   String? emailError;
   String? confirmEmailError;
   String? passError;
   String? confirmPassError;
-  String? usernameExistsError;
   String? emailExistsError;
 
   String? documentoError;
   String? nombreClienteError;
   String? telefonoError;
   String? tipoDocumentoError;
+  String? direccionError;
 
-  String? validateName(String? value) {
+  String? validateDireccion(String? value) {
     if (value == null || value.isEmpty) {
       return "Obligatorio";
     }
-    if (value.length < 3) {
-      return "Mín 3 caracteres";
+    if (value.length < 5) {
+      return "Mín 5 caracteres";
     }
     return null;
   }
@@ -105,38 +104,12 @@ class _RegisterPageState extends State<RegisterPage> {
     return null;
   }
 
-  Future<void> checkUsernameExists(String value) async {
-    if (value.isEmpty) {
-      setState(() => usernameExistsError = null);
-      return;
-    }
-    final checkUrl = Uri.parse("http://astrhoapp.somee.com/api/Usuarios");
-    try {
-      final checkResponse = await http.get(checkUrl);
-      if (checkResponse.statusCode == 200) {
-        List<dynamic> users = jsonDecode(checkResponse.body);
-        bool userExists = users.any(
-          (u) =>
-              u["nombreUsuario"].toString().toLowerCase() ==
-              value.trim().toLowerCase(),
-        );
-        setState(
-          () => usernameExistsError = userExists ? "Usuario ya existe" : null,
-        );
-      } else {
-        setState(() => usernameExistsError = null);
-      }
-    } catch (e) {
-      setState(() => usernameExistsError = null);
-    }
-  }
-
   Future<void> checkEmailExists(String value) async {
     if (value.isEmpty) {
       setState(() => emailExistsError = null);
       return;
     }
-    final checkUrl = Uri.parse("http://astrhoapp.somee.com/api/Usuarios");
+    final checkUrl = Uri.parse("http://www.astrhoapp.somee.com/api/Usuarios");
     try {
       final checkResponse = await http.get(checkUrl);
       if (checkResponse.statusCode == 200) {
@@ -159,7 +132,6 @@ class _RegisterPageState extends State<RegisterPage> {
   Future<void> registerUser() async {
     // Validate all fields
     setState(() {
-      nameError = validateName(nameController.text);
       emailError = validateEmail(emailController.text);
       confirmEmailError = validateConfirmEmail(confirmEmailController.text);
       passError = validatePass(passController.text);
@@ -168,44 +140,36 @@ class _RegisterPageState extends State<RegisterPage> {
       nombreClienteError = validateNombreCliente(nombreCtrl.text);
       telefonoError = validateTelefono(telefonoCtrl.text);
       tipoDocumentoError = tipoDocumento == null ? "Obligatorio" : null;
+      direccionError = validateDireccion(direccionCtrl.text);
     });
 
-    if (nameError != null ||
-        emailError != null ||
+    if (emailError != null ||
         confirmEmailError != null ||
         passError != null ||
         confirmPassError != null ||
         documentoError != null ||
         nombreClienteError != null ||
         telefonoError != null ||
-        tipoDocumentoError != null) {
+        tipoDocumentoError != null ||
+        direccionError != null) {
       showError("Corrige los errores antes de continuar");
       return;
     }
 
     setState(() => isLoading = true);
 
-    // Check if user or email already exists
-    final checkUrl = Uri.parse("http://astrhoapp.somee.com/api/Usuarios");
+    // Check if email already exists
+    final checkUrl = Uri.parse("http://www.astrhoapp.somee.com/api/Usuarios");
     try {
       final checkResponse = await http.get(checkUrl);
       if (checkResponse.statusCode == 200) {
         List<dynamic> users = jsonDecode(checkResponse.body);
-        bool userExists = users.any(
-          (u) =>
-              u["nombreUsuario"].toString().toLowerCase() ==
-              nameController.text.trim().toLowerCase(),
-        );
         bool emailExists = users.any(
           (u) =>
               u["email"].toString().toLowerCase() ==
               emailController.text.trim().toLowerCase(),
         );
 
-        if (userExists) {
-          showError("El nombre de usuario ya está en uso");
-          return;
-        }
         if (emailExists) {
           showError("El correo ya está registrado");
           return;
@@ -220,11 +184,11 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
-    final url = Uri.parse("http://astrhoapp.somee.com/api/Usuarios");
+    final url = Uri.parse("http://www.astrhoapp.somee.com/api/Usuarios");
 
     final body = {
       "rolId": 2, // 2 = Cliente
-      "nombreUsuario": nameController.text.trim(),
+      "nombreUsuario": emailController.text.split('@')[0], // Use email prefix as username
       "email": emailController.text.trim(),
       "contrasena": passController.text.trim(),
       "confirmarContrasena": confirmPassController.text.trim(),
@@ -240,7 +204,7 @@ class _RegisterPageState extends State<RegisterPage> {
       if (response.statusCode == 200 || response.statusCode == 201) {
         int? newUserId;
         try {
-          final getRes = await http.get(Uri.parse("http://astrhoapp.somee.com/api/Usuarios"));
+          final getRes = await http.get(Uri.parse("http://www.astrhoapp.somee.com/api/Usuarios"));
           if (getRes.statusCode == 200) {
             List<dynamic> users = jsonDecode(getRes.body);
             var createdUser = users.firstWhere(
@@ -262,11 +226,12 @@ class _RegisterPageState extends State<RegisterPage> {
             "tipoDocumento": tipoDocumento,
             "nombre": nombreCtrl.text,
             "telefono": telefonoCtrl.text,
+            "direccion": direccionCtrl.text,
             "estado": true,
           };
           
           final clientRes = await http.post(
-            Uri.parse("http://astrhoapp.somee.com/api/Clientes"),
+            Uri.parse("http://www.astrhoapp.somee.com/api/Clientes"),
             headers: {"Content-Type": "application/json"},
             body: jsonEncode(clientData),
           );
@@ -379,40 +344,6 @@ class _RegisterPageState extends State<RegisterPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                const Text("Nombre de usuario"),
-                                if (nameError != null ||
-                                    usernameExistsError != null) ...[
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    nameError ?? usernameExistsError!,
-                                    style: const TextStyle(
-                                      color: Colors.red,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 5),
-                            inputBox(
-                              controller: nameController,
-                              icon: Icons.person,
-                              hint: "Ingrese tu nombre de usuario",
-                              onChanged: (value) {
-                                setState(() => nameError = validateName(value));
-                                checkUsernameExists(value);
-                              },
-                              isError:
-                                  nameError != null ||
-                                  usernameExistsError != null,
-                              isValid:
-                                  nameError == null &&
-                                  usernameExistsError == null &&
-                                  nameController.text.isNotEmpty,
-                            ),
-
                             const SizedBox(height: 8),
                             Row(
                               children: [
@@ -575,7 +506,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: DropdownButtonFormField<String>(
-                                      value: tipoDocumento,
+                                      initialValue: tipoDocumento,
                                       hint: const Text("Selecciona tipo"),
                                       items: tipoDocumentoOptions.map((String value) {
                                         return DropdownMenuItem<String>(
@@ -669,6 +600,34 @@ class _RegisterPageState extends State<RegisterPage> {
                               hint: "Ingresa tu teléfono",
                               onChanged: (value) => setState(() => telefonoError = validateTelefono(value)),
                               isError: telefonoError != null,
+                            ),
+
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                const Text("Dirección"),
+                                if (direccionError != null) ...[
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    direccionError!,
+                                    style: const TextStyle(
+                                      color: Colors.red,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 5),
+                            inputBox(
+                              controller: direccionCtrl,
+                              icon: Icons.location_on,
+                              hint: "Ingresa tu dirección",
+                              onChanged: (value) => setState(() => direccionError = validateDireccion(value)),
+                              isError: direccionError != null,
+                              isValid:
+                                  direccionError == null &&
+                                  direccionCtrl.text.isNotEmpty,
                             ),
 
                             const SizedBox(height: 25),

@@ -10,6 +10,7 @@ import 'auth/screens/reset_password_page.dart';
 import 'auth/screens/home_page.dart';
 import 'auth/screens/admin_page.dart';
 import 'auth/screens/assistant_page.dart';
+import 'auth/screens/profile_page.dart';
 
 // AGENDA
 import 'agenda/screens/mis_citas_screen.dart';
@@ -67,6 +68,9 @@ class MyApp extends StatelessWidget {
 
         // AGENDA
         '/mis-citas': (_) => const MisCitasScreen(),
+
+        // PERFIL
+        '/profile': (_) => ProfilePage(user: const {}),
       },
     );
   }

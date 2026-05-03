@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'profile_page.dart';
 
 class AdminPage extends StatefulWidget {
+  const AdminPage({super.key});
+
   @override
   _AdminPageState createState() => _AdminPageState();
 }
@@ -147,6 +150,18 @@ class _AdminPageState extends State<AdminPage> {
             text: "Gestión de Citas",
             onTap: () {
               Navigator.pushNamed(context, '/mis-citas', arguments: user);
+            },
+          ),
+          _drawerItem(
+            icon: Icons.person,
+            text: "Mi Perfil",
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProfilePage(user: user ?? {}),
+                ),
+              );
             },
           ),
           const Spacer(),

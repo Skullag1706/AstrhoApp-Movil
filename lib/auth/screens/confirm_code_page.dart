@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../core/services/auth_service.dart';
 
 class ConfirmCodePage extends StatefulWidget {
+  const ConfirmCodePage({super.key});
+
   @override
   _ConfirmCodePageState createState() => _ConfirmCodePageState();
 }
@@ -150,7 +152,7 @@ class _ConfirmCodePageState extends State<ConfirmCodePage> {
                   ),
                   SizedBox(height: 10),
                   Text(
-                    "$email",
+                    email,
                     style: TextStyle(color: Colors.white70, fontSize: 14),
                   ),
                   SizedBox(height: 30),

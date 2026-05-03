@@ -1,0 +1,82 @@
+  // Obtener servicios
+  Future<List<Servicio>> getServicios() async {
+    try {
+      // Intentar primero con la ruta plural
+      final response = await http
+          .get(Uri.parse('$baseUrl/Servicios'), headers: _headers)
+          .timeout(timeoutDuration);
+
+      print('Intentando endpoint: $baseUrl/Servicios');
+      print('Respuesta servicios status: ${response.statusCode}');
+      print('Respuesta servicios body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return _parseServicioList(response.body);
+      } else if (response.statusCode == 404) {
+        // Intentar con ruta singular
+        final responseSingular = await http
+            .get(Uri.parse('$baseUrl/Servicio'), headers: _headers)
+            .timeout(timeoutDuration);
+        print('Intentando endpoint singular: $baseUrl/Servicio');
+        print('Respuesta singular status: ${responseSingular.statusCode}');
+        if (responseSingular.statusCode == 200) {
+          return _parseServicioList(responseSingular.body);
+        }
+      }
+      return [];
+    } catch (e) {
+      print('Excepción al obtener servicios: $e');
+      return [];
+    }
+  }
+
+  List<Servicio> _parseServicioList(String body) {
+    if (body.trim().isEmpty) {
+      print('Cuerpo de servicios vacío');
+      return [];
+    }
+    try {
+      final dynamic data = _parseJson(body);
+      List<dynamic> list = [];
+      if (data is List) {
+        list = data;
+      } else if (data is Map<String, dynamic>) {
+        if (data.containsKey('data') && data['data'] is List) {
+          list = data['data'];
+        } else if (data.containsKey('items') && data['items'] is List) {
+          list = data['items'];
+        } else {
+          for (var value in data.values) {
+            if (value is List) {
+              list = value;
+              break;
+            }
+          }
+        }
+      }
+      print('Lista de servicios para parsear: ${list.length} elementos');
+      final servicios = list
+          .map((json) {
+            try {
+              print('Parseando servicio: $json');
+              final servicio = Servicio.fromJson(json as Map<String, dynamic>);
+              print('Servicio parseado: ID=${servicio.servicioId}, Nombre=${servicio.nombre}, Precio=${servicio.precio}');
+              return servicio;
+            } catch (e) {
+              print('Error al parsear servicio individual: $e');
+              return null;
+            }
+          })
+          .where((s) => s != null)
+          .cast<Servicio>()
+          .toList();
+      print('Servicios parseados exitosamente: ${servicios.length}');
+      for (var s in servicios) {
+        print('  - ${s.servicioId}: ${s.nombre} - ${s.precio}');
+      }
+      return servicios;
+    } catch (e) {
+      print('Error general parseando lista de servicios: $e');
+      return [];
+    }
+  }

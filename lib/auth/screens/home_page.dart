@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'profile_page.dart';
 
 class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
   @override
   _HomePageState createState() => _HomePageState();
 }
@@ -141,6 +144,18 @@ class _HomePageState extends State<HomePage> {
             text: "Mis citas",
             onTap: () {
               Navigator.pushNamed(context, '/mis-citas', arguments: user);
+            },
+          ),
+          _drawerItem(
+            icon: Icons.person,
+            text: "Mi Perfil",
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProfilePage(user: user ?? {}),
+                ),
+              );
             },
           ),
           const Spacer(),

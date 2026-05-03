@@ -90,7 +90,10 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
             text: "Principal",
             onTap: () {
               // Redirigir según el rol
-              if (rol == 'administrador') {
+              if (rol == 'administrador' || 
+                  rol == 'super admin' || 
+                  rol == 'superadmin' || 
+                  rol == 'super administrador') {
                 Navigator.pushNamedAndRemoveUntil(
                   context,
                   '/admin',
@@ -204,21 +207,27 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          // En caso de error, inicializar listas vacías
           _activeAgendas = [];
           _historyAgendas = [];
           _activeCount = 0;
           _historyCount = 0;
         });
-      }
-      // No mostrar error si la lista está vacía (comportamiento esperado)
-      // Solo mostrar error si hay un problema real de conexión
-      if (mounted && e.toString().contains('Tiempo de espera')) {
+        
+        String errorMessage = e.toString();
+        if (errorMessage.contains('Exception:')) {
+          errorMessage = errorMessage.split('Exception:').last.trim();
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error de conexión. Verifica tu internet.'),
-            backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 3),
+            content: Text('Error: $errorMessage'),
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Reintentar',
+              textColor: Colors.white,
+              onPressed: _loadAgendas,
+            ),
           ),
         );
       }
