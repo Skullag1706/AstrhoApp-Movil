@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../agenda/models/agenda.dart';
-import '../../core/services/api_service.dart';
+import 'package:astrhoapp/core/utils/colors.dart';
 
 class ProfilePage extends StatefulWidget {
   final Map<dynamic, dynamic> user;
@@ -14,7 +14,6 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  late final ApiService _apiService;
   bool isLoading = true;
   bool isEditing = false;
 
@@ -47,7 +46,6 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
-    _apiService = ApiService(token: _authToken);
     _loadProfileData();
   }
 
@@ -278,32 +276,38 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _saveProfile() async {
     if (_nombreController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('El nombre es obligatorio'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('El nombre es obligatorio'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
       return;
     }
 
     if (_passwordController.text.isNotEmpty || _confirmPasswordController.text.isNotEmpty) {
       if (_passwordController.text != _confirmPasswordController.text) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Las contraseñas no coinciden'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Las contraseñas no coinciden'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
         return;
       }
       if (_passwordController.text.length < 6) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('La contraseña debe tener al menos 6 caracteres'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('La contraseña debe tener al menos 6 caracteres'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
         return;
       }
     }
@@ -423,25 +427,35 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(60),
-        child: AppBar(
-          elevation: 0,
-          backgroundColor: Colors.transparent,
-          flexibleSpace: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0XFF9D26F2), Color(0XFFE9418C)],
-              ),
+  Widget _topBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(gradient: AppColors.primaryGradient),
+      child: SafeArea(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back, color: AppColors.white),
+              onPressed: () => Navigator.pop(context),
             ),
-          ),
-          title: const Text('Mi Perfil'),
-          actions: [
+            Row(
+              children: [
+                const Icon(Icons.auto_awesome, color: AppColors.white, size: 24),
+                const SizedBox(width: 8),
+                const Text(
+                  'Mi Perfil',
+                  style: TextStyle(
+                    color: AppColors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
             IconButton(
               icon: Icon(isEditing ? Icons.check : Icons.edit),
+              color: AppColors.white,
               onPressed: () {
                 setState(() {
                   if (isEditing) {
@@ -455,161 +469,174 @@ class _ProfilePageState extends State<ProfilePage> {
           ],
         ),
       ),
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0XFF9D26F2), Color(0XFFE9418C)],
-          ),
-        ),
-        child: isLoading
-            ? const Center(child: CircularProgressIndicator(color: Colors.white))
-            : SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Container(
-                  padding: const EdgeInsets.all(25),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.purple.shade50,
-                          ),
-                          child: const Icon(
-                            Icons.person,
-                            size: 60,
-                            color: Color(0xFF7926F7),
-                          ),
-                        ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.scaffoldBackground,
+      body: Column(
+        children: [
+          _topBar(),
+          Expanded(
+            child: isLoading
+                ? const Center(child: CircularProgressIndicator(color: AppColors.primaryPurple))
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: AppColors.borderLight),
                       ),
-                      const SizedBox(height: 25),
-                      _buildProfileField(
-                        label: 'Correo Electrónico',
-                        controller: _emailController,
-                        icon: Icons.email,
-                        enabled: false,
-                      ),
-                      const SizedBox(height: 16),
-                      _buildProfileField(
-                        label: 'Documento',
-                        controller: _documentoController,
-                        icon: Icons.credit_card,
-                        enabled: false,
-                      ),
-                      const SizedBox(height: 16),
-                      _buildProfileField(
-                        label: 'Nombre Completo',
-                        controller: _nombreController,
-                        icon: Icons.person_outline,
-                        enabled: isEditing,
-                      ),
-                      const SizedBox(height: 16),
-                      _buildProfileField(
-                        label: 'Teléfono',
-                        controller: _telefonoController,
-                        icon: Icons.phone,
-                        enabled: isEditing,
-                      ),
-                      const SizedBox(height: 16),
-                      _buildProfileField(
-                        label: 'Dirección',
-                        controller: _direccionController,
-                        icon: Icons.location_on,
-                        enabled: isEditing,
-                      ),
-                      const SizedBox(height: 16),
-                      _buildInfoCard(
-                        'Rol',
-                        widget.user['rolNombre'] ?? widget.user['rol'] ?? 'N/A',
-                        Icons.security,
-                      ),
-                      if (isEditing) ...[
-                        const SizedBox(height: 16),
-                        _buildProfileField(
-                          label: 'Nueva Contraseña',
-                          controller: _passwordController,
-                          icon: Icons.lock_outline,
-                          enabled: true,
-                          obscureText: true,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildProfileField(
-                          label: 'Confirmar Contraseña',
-                          controller: _confirmPasswordController,
-                          icon: Icons.lock,
-                          enabled: true,
-                          obscureText: true,
-                        ),
-                        const SizedBox(height: 30),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.grey.shade300,
-                                  padding: const EdgeInsets.symmetric(vertical: 15),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    isEditing = false;
-                                    _passwordController.clear();
-                                    _confirmPasswordController.clear();
-                                    _loadProfileData(); // Volver a cargar datos originales
-                                  });
-                                },
-                                child: const Text(
-                                  'Cancelar',
-                                  style: TextStyle(
-                                    color: Colors.black87,
-                                    fontSize: 16,
-                                  ),
-                                ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Center(
+                            child: Container(
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: AppColors.lightPurpleBackground,
+                              ),
+                              child: const Icon(
+                                Icons.person,
+                                size: 64,
+                                color: AppColors.primaryPurple,
                               ),
                             ),
-                            const SizedBox(width: 15),
-                            Expanded(
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF7926F7),
-                                  padding: const EdgeInsets.symmetric(vertical: 15),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                          ),
+                          const SizedBox(height: 28),
+                          _buildProfileField(
+                            label: 'Correo Electrónico',
+                            controller: _emailController,
+                            icon: Icons.email,
+                            enabled: false,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildProfileField(
+                            label: 'Documento',
+                            controller: _documentoController,
+                            icon: Icons.credit_card,
+                            enabled: false,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildProfileField(
+                            label: 'Nombre Completo',
+                            controller: _nombreController,
+                            icon: Icons.person_outline,
+                            enabled: isEditing,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildProfileField(
+                            label: 'Teléfono',
+                            controller: _telefonoController,
+                            icon: Icons.phone,
+                            enabled: isEditing,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildProfileField(
+                            label: 'Dirección',
+                            controller: _direccionController,
+                            icon: Icons.location_on,
+                            enabled: isEditing,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildInfoCard(
+                            'Rol',
+                            widget.user['rolNombre'] ?? widget.user['rol'] ?? 'N/A',
+                            Icons.security,
+                          ),
+                          if (isEditing) ...[
+                            const SizedBox(height: 16),
+                            _buildProfileField(
+                              label: 'Nueva Contraseña',
+                              controller: _passwordController,
+                              icon: Icons.lock_outline,
+                              enabled: true,
+                              obscureText: true,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildProfileField(
+                              label: 'Confirmar Contraseña',
+                              controller: _confirmPasswordController,
+                              icon: Icons.lock,
+                              enabled: true,
+                              obscureText: true,
+                            ),
+                            const SizedBox(height: 32),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.scaffoldBackground,
+                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      elevation: 0,
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        isEditing = false;
+                                        _passwordController.clear();
+                                        _confirmPasswordController.clear();
+                                        _loadProfileData();
+                                      });
+                                    },
+                                    child: const Text(
+                                      'Cancelar',
+                                      style: TextStyle(
+                                        color: AppColors.textDark,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
                                   ),
                                 ),
-                                onPressed: _saveProfile,
-                                child: isLoading
-                                    ? const CircularProgressIndicator(
-                                        color: Colors.white,
-                                      )
-                                    : const Text(
-                                        'Guardar',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primaryPurple,
+                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
                                       ),
-                              ),
+                                      elevation: 0,
+                                    ),
+                                    onPressed: _saveProfile,
+                                    child: isLoading
+                                        ? const SizedBox(
+                                            height: 20,
+                                            width: 20,
+                                            child: CircularProgressIndicator(
+                                              color: AppColors.white,
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        : const Text(
+                                            'Guardar',
+                                            style: TextStyle(
+                                              color: AppColors.white,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
-                        ),
-                      ],
-                    ],
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ),
+          ),
+        ],
       ),
     );
   }
@@ -628,7 +655,7 @@ class _ProfilePageState extends State<ProfilePage> {
           label,
           style: const TextStyle(
             fontSize: 14,
-            color: Color(0xFF7926F7),
+            color: AppColors.primaryPurple,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -636,16 +663,16 @@ class _ProfilePageState extends State<ProfilePage> {
         Container(
           decoration: BoxDecoration(
             border: Border.all(
-              color: enabled ? Colors.grey.shade300 : Colors.grey.shade200,
-              width: 2,
+              color: enabled ? AppColors.borderLight : AppColors.borderLight,
+              width: 1,
             ),
-            borderRadius: BorderRadius.circular(12),
-            color: enabled ? Colors.white : Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(16),
+            color: enabled ? AppColors.scaffoldBackground : AppColors.scaffoldBackground,
           ),
           child: Row(
             children: [
               const SizedBox(width: 12),
-              Icon(icon, color: Colors.grey),
+              Icon(icon, color: AppColors.textGray),
               const SizedBox(width: 10),
               Expanded(
                 child: TextFormField(
@@ -671,12 +698,12 @@ class _ProfilePageState extends State<ProfilePage> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.purple.shade50,
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.lightPurpleBackground,
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         children: [
-          Icon(icon, color: const Color(0xFF7926F7)),
+          Icon(icon, color: AppColors.primaryPurple),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -686,7 +713,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   title,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey.shade600,
+                    color: AppColors.textGray,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -695,7 +722,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                    color: AppColors.textDark,
                   ),
                 ),
               ],

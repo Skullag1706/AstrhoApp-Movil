@@ -2,13 +2,24 @@ import 'package:flutter/material.dart';
 import '../models/agenda.dart';
 import 'package:astrhoapp/core/services/api_service.dart';
 import 'package:astrhoapp/core/utils/colors.dart';
-import 'package:astrhoapp/shared/widgets/app_header.dart';
-import 'package:astrhoapp/agenda/widgets/appointment_card.dart';
-import 'agenda_form_screen.dart';
+import 'package:astrhoapp/core/widgets/app_bottom_nav.dart';
+import 'appointment_flow_screen.dart';
 import 'agenda_detail_screen.dart';
+import 'package:intl/intl.dart';
 
 class MisCitasScreen extends StatefulWidget {
-  const MisCitasScreen({super.key});
+  final Map<dynamic, dynamic>? user;
+  final String? token;
+  final bool showBackButton;
+  final bool showBottomNav;
+
+  const MisCitasScreen({
+    super.key, 
+    this.user, 
+    this.token, 
+    this.showBackButton = false,
+    this.showBottomNav = true,
+  });
 
   @override
   State<MisCitasScreen> createState() => _MisCitasScreenState();
@@ -19,158 +30,355 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
   List<Agenda> _activeAgendas = [];
   List<Agenda> _historyAgendas = [];
   bool _isLoading = true;
-  String _selectedTab = 'Activas';
+  String _selectedTab = 'Próximas';
   int _activeCount = 0;
   int _historyCount = 0;
-  DateTime? _selectedDate;
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   Map<dynamic, dynamic>? user;
 
-  bool _isInitialized = false;
-
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_isInitialized) {
-      final args = ModalRoute.of(context)?.settings.arguments;
-      if (args != null && args is Map) {
-        user = args;
-        final token = user!['token']?.toString();
-        _apiService = ApiService(token: token);
-      } else {
-        _apiService = ApiService();
-      }
-      _loadAgendas();
-      _isInitialized = true;
-    }
+  void initState() {
+    super.initState();
+    user = widget.user;
+    final token = widget.token ?? user?['token']?.toString();
+    _apiService = ApiService(token: token);
+    _loadAgendas();
   }
 
-  // ... (rest of existing methods, need to be careful with positioning) ...
+  Widget _topBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(gradient: AppColors.primaryGradient),
+      child: SafeArea(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back, color: AppColors.white),
+              onPressed: () {
+                Navigator.pushReplacementNamed(context, '/home');
+              },
+            ),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.auto_awesome,
+                    color: AppColors.primaryPurple,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  "AstrhoApp",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.white,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 48),
+          ],
+        ),
+      ),
+    );
+  }
 
-  Widget _buildDrawer(BuildContext context) {
-    print("User Data in Drawer: $user");
-    final rol = user != null ? user!["rol"]?.toString().toLowerCase() : "";
-
-    return Drawer(
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-            width: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF7926F7), Color(0xFFF63D77)],
+  Widget _buildTabs() {
+    return Row(
+      children: [
+        Expanded(
+          child: GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedTab = 'Próximas';
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: _selectedTab == 'Próximas'
+                    ? const Color(0xFF7926F7)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Center(
+                child: Text(
+                  'Próximas ($_activeCount)',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: _selectedTab == 'Próximas'
+                        ? Colors.white
+                        : Colors.grey[600],
+                  ),
+                ),
               ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: const [
-                    Icon(Icons.calendar_month, color: Colors.white),
-                    SizedBox(width: 10),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedTab = 'Historial';
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: _selectedTab == 'Historial'
+                    ? const Color(0xFF7926F7)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Center(
+                child: Text(
+                  'Historial ($_historyCount)',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: _selectedTab == 'Historial'
+                        ? Colors.white
+                        : Colors.grey[600],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAppointmentCard(Agenda agenda) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 60,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEAD8FF),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
                     Text(
-                      "AstrhoApp\nGestión de Citas",
+                      'MAY',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: Color(0xFF7926F7),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      agenda.fechaCita.day.toString(),
+                      style: TextStyle(
+                        color: Colors.black87,
+                        fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
                 ),
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.close, color: Colors.white),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      DateFormat('EEEE, d \'de\' MMMM', 'es_ES').format(agenda.fechaCita),
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEAD8FF),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            agenda.horaInicio.substring(0, 5),
+                            style: const TextStyle(
+                              color: Color(0xFF7926F7),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFCE8FF),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'Próxima cita',
+                            style: const TextStyle(
+                              color: Color(0xFFE54BCF),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              const CircleAvatar(
+                radius: 20,
+                backgroundColor: Color(0xFFEAD8FF),
+                child: Icon(Icons.person, color: Color(0xFF7926F7), size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      agenda.nombreEmpleado ?? 'Profesional',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      'Estilista Profesional',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (agenda.servicios != null && agenda.servicios!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 52),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Servicios',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  ...agenda.servicios!.map((s) => Text(
+                        '• ${s.nombre}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                        ),
+                      )),
+                ],
+              ),
+            ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Total',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 14,
+                ),
+              ),
+              Text(
+                _formatCurrency(_calculateTotal(agenda)),
+                style: const TextStyle(
+                  color: Color(0xFF7926F7),
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFF7926F7)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () {
+                _navigateToDetail(agenda);
+              },
+              child: const Text(
+                'Ver detalles',
+                style: TextStyle(
+                  color: Color(0xFF7926F7),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
-          _drawerItem(
-            icon: Icons.dashboard,
-            text: "Principal",
-            onTap: () {
-              // Redirigir según el rol
-              if (rol == 'administrador' || 
-                  rol == 'super admin' || 
-                  rol == 'superadmin' || 
-                  rol == 'super administrador') {
-                Navigator.pushNamedAndRemoveUntil(
-                  context,
-                  '/admin',
-                  (route) => false,
-                  arguments: user,
-                );
-              } else if (rol == 'asistente') {
-                Navigator.pushNamedAndRemoveUntil(
-                  context,
-                  '/assistant',
-                  (route) => false,
-                  arguments: user,
-                );
-              } else if (rol == 'cliente') {
-                Navigator.pushNamedAndRemoveUntil(
-                  context,
-                  '/home',
-                  (route) => false,
-                  arguments: user,
-                );
-              } else {
-                // Fallback
-                Navigator.pushNamedAndRemoveUntil(
-                  context,
-                  '/home',
-                  (route) => false,
-                  arguments: user,
-                );
-              }
-            },
-          ),
-          _drawerItem(
-            icon: Icons.calendar_month,
-            text: "Gestión de Citas",
-            selected: true,
-            onTap: () => Navigator.pop(context),
-          ),
-          const Spacer(),
-          _drawerItem(
-            icon: Icons.logout,
-            text: "Cerrar sesión",
-            color: Colors.red,
-            onTap: () {
-              Navigator.pushReplacementNamed(context, '/');
-            },
-          ),
-          const SizedBox(height: 20),
         ],
       ),
     );
   }
 
-  Widget _drawerItem({
-    required IconData icon,
-    required String text,
-    VoidCallback? onTap,
-    bool selected = false,
-    Color? color,
-  }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: selected ? Colors.purple.shade50 : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ListTile(
-        leading: Icon(icon, color: color ?? Color(0xFF7926F7)),
-        title: Text(
-          text,
-          style: TextStyle(
-            color: color ?? Colors.black87,
-            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-        onTap: onTap,
-      ),
+  double _calculateTotal(Agenda agenda) {
+    if (agenda.servicios == null || agenda.servicios!.isEmpty) {
+      return 0;
+    }
+    return agenda.servicios!.fold(0.0, (sum, s) => sum + s.precio);
+  }
+
+  String _formatCurrency(double amount) {
+    final formatter = NumberFormat.currency(
+      locale: 'es_CO',
+      symbol: '\$',
+      decimalDigits: 0,
     );
+    return formatter.format(amount);
   }
 
   Future<void> _loadAgendas() async {
@@ -212,73 +420,24 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
           _activeCount = 0;
           _historyCount = 0;
         });
-        
-        String errorMessage = e.toString();
-        if (errorMessage.contains('Exception:')) {
-          errorMessage = errorMessage.split('Exception:').last.trim();
-        }
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $errorMessage'),
+            content: Text('Error: $e'),
             backgroundColor: Colors.redAccent,
-            duration: const Duration(seconds: 4),
-            action: SnackBarAction(
-              label: 'Reintentar',
-              textColor: Colors.white,
-              onPressed: _loadAgendas,
-            ),
           ),
         );
       }
     }
   }
 
-  Future<void> _selectDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-      locale: const Locale('es', 'ES'),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: AppColors.primaryPurple,
-              onPrimary: Colors.white,
-              onSurface: AppColors.textDark,
-            ),
-            textButtonTheme: TextButtonThemeData(
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.primaryPurple,
-              ),
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-      });
-    }
-  }
-
-  void _clearDateFilter() {
-    setState(() {
-      _selectedDate = null;
-    });
-  }
-
-  void _navigateToForm({Agenda? agenda}) async {
+  void _navigateToForm() async {
     final token = user?['token']?.toString();
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) =>
-            AgendaFormScreen(agenda: agenda, token: token, user: user),
+            AppointmentFlowScreen(token: token, user: user),
       ),
     );
 
@@ -299,191 +458,50 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
   }
 
   List<Agenda> get _currentAgendas {
-    final list = _selectedTab == 'Activas' ? _activeAgendas : _historyAgendas;
-
-    if (_selectedDate == null) {
-      return list;
-    }
-
-    return list.where((agenda) {
-      // Comparar solo la parte de la fecha (año, mes, día)
-      return agenda.fechaCita.year == _selectedDate!.year &&
-          agenda.fechaCita.month == _selectedDate!.month &&
-          agenda.fechaCita.day == _selectedDate!.day;
-    }).toList();
+    return _selectedTab == 'Próximas' ? _activeAgendas : _historyAgendas;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      key: _scaffoldKey,
-      drawer: _buildDrawer(context),
-      body: Container(
-        decoration: BoxDecoration(gradient: AppColors.primaryGradient),
-        child: SafeArea(
-          child: Column(
-            children: [
-              AppHeader(
-                title: 'Mis Citas',
-                onMenuPressed: () {
-                  _scaffoldKey.currentState?.openDrawer();
-                },
+      backgroundColor: const Color(0xFFF8F3FA),
+      body: Column(
+        children: [
+          _topBar(),
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.only(top: 20),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(30),
+                  topRight: Radius.circular(30),
+                ),
               ),
-              Expanded(
-                child: Container(
-                  margin: const EdgeInsets.only(top: 20),
-                  decoration: const BoxDecoration(
-                    color: AppColors.white,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(30),
-                      topRight: Radius.circular(30),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Mis Citas',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        _buildTabs(),
+                      ],
                     ),
                   ),
-                  child: Column(
-                    children: [
-                      // Tarjeta principal con título y botón agregar
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Administrar Citas',
-                                      style: TextStyle(
-                                        fontSize: 28,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.textDark,
-                                      ),
-                                    ),
-                                    SizedBox(height: 4),
-                                    Text(
-                                      'Gestiona las citas de tus clientes',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: AppColors.textGray,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                FloatingActionButton(
-                                  heroTag: 'btnSearch',
-                                  onPressed: _selectDate,
-                                  backgroundColor: AppColors.white,
-                                  elevation: 2,
-                                  mini: true,
-                                  child: const Icon(
-                                    Icons.search,
-                                    color: AppColors.primaryPurple,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                FloatingActionButton(
-                                  heroTag: 'btnAdd',
-                                  onPressed: () => _navigateToForm(),
-                                  backgroundColor: AppColors.primaryPink,
-                                  mini: true,
-                                  child: const Icon(
-                                    Icons.add,
-                                    color: AppColors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-
-                            const SizedBox(height: 20),
-                            // Tabs
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _buildTab(
-                                    'Activas',
-                                    _activeCount,
-                                    _selectedTab == 'Activas',
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _buildTab(
-                                    'Historial',
-                                    _historyCount,
-                                    _selectedTab == 'Historial',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Filtro de fecha
-                      if (_selectedDate != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 8,
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.lightPurple.withOpacity(
-                                      0.1,
-                                    ),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: AppColors.primaryPurple
-                                          .withOpacity(0.3),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.calendar_today,
-                                        size: 16,
-                                        color: AppColors.primaryPurple,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Filtrado por: ${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
-                                        style: const TextStyle(
-                                          color: AppColors.primaryPurple,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              IconButton(
-                                onPressed: _clearDateFilter,
-                                icon: const Icon(Icons.close),
-                                color: Colors.grey,
-                                tooltip: 'Borrar filtro',
-                              ),
-                            ],
-                          ),
-                        ),
-                      // Lista de citas
-                      Expanded(
-                        child: _isLoading
-                            ? const Center(child: CircularProgressIndicator())
-                            : _currentAgendas.isEmpty
+                  Expanded(
+                    child: _isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : _currentAgendas.isEmpty
                             ? Center(
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
@@ -491,16 +509,14 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
                                     Icon(
                                       Icons.calendar_today_outlined,
                                       size: 64,
-                                      color: AppColors.textGray.withOpacity(
-                                        0.5,
-                                      ),
+                                      color: Colors.grey.withValues(alpha: 0.5),
                                     ),
                                     const SizedBox(height: 16),
                                     Text(
                                       'No hay citas ${_selectedTab.toLowerCase()}',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 16,
-                                        color: AppColors.textGray,
+                                        color: Colors.grey[600],
                                       ),
                                     ),
                                   ],
@@ -509,71 +525,33 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
                             : RefreshIndicator(
                                 onRefresh: _loadAgendas,
                                 child: ListView.builder(
-                                  padding: const EdgeInsets.only(bottom: 20),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 10,
+                                  ),
                                   itemCount: _currentAgendas.length,
                                   itemBuilder: (context, index) {
                                     final agenda = _currentAgendas[index];
-                                    return AppointmentCard(
-                                      agenda: agenda,
-                                      onView: () => _navigateToDetail(agenda),
-                                      onEdit: _selectedTab == 'Activas'
-                                          ? () =>
-                                                _navigateToForm(agenda: agenda)
-                                          : null,
-                                    );
+                                    return _buildAppointmentCard(agenda);
                                   },
                                 ),
                               ),
-                      ),
-                    ],
                   ),
-                ),
+                ],
               ),
-              // Footer
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: const Text(
-                  '© 2025 Todos los derechos reservados',
-                  style: TextStyle(color: AppColors.white, fontSize: 12),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTab(String label, int count, bool isSelected) {
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedTab = label;
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.lightPurple.withOpacity(0.2)
-              : AppColors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? AppColors.primaryPurple : Colors.transparent,
-            width: 1,
-          ),
-        ),
-        child: Center(
-          child: Text(
-            '$label ($count)',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              color: isSelected ? AppColors.primaryPurple : AppColors.textGray,
             ),
           ),
-        ),
+        ],
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _navigateToForm,
+        backgroundColor: const Color(0xFF7926F7),
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
+      bottomNavigationBar: widget.showBottomNav ? AppBottomNav(
+        currentRoute: '/mis-citas',
+        user: user,
+      ) : null,
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:astrhoapp/core/services/auth_service.dart';
+import 'package:astrhoapp/core/utils/colors.dart';
 
 class ResetPasswordPage extends StatefulWidget {
   const ResetPasswordPage({super.key});
@@ -16,7 +17,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   bool obscureNew = true;
   bool obscureConfirm = true;
 
-  String? codeError;
   String? newPassError;
   String? confirmPassError;
 
@@ -58,17 +58,18 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     
     if (resetToken == null) {
       setState(() => loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Token no encontrado"),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Token no encontrado"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
       return;
     }
 
     try {
-      // Reset the password
       final success = await AuthService.resetPassword(
         resetToken,
         newPassCtrl.text.trim(),
@@ -78,30 +79,86 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       setState(() => loading = false);
 
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Contraseña cambiada exitosamente"),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.pushReplacementNamed(context, '/');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Contraseña cambiada exitosamente"),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.pushReplacementNamed(context, '/');
+        }
       } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Error al cambiar contraseña"),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() => loading = false);
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Error al cambiar contraseña"),
+            content: Text("Error de conexión: $e"),
             backgroundColor: Colors.red,
           ),
         );
       }
-    } catch (e) {
-      setState(() => loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Error de conexión: $e"),
-          backgroundColor: Colors.red,
-        ),
-      );
     }
+  }
+
+  Widget _topBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Row(
+              children: [
+                const Icon(Icons.arrow_back, color: AppColors.primaryPurple),
+                const SizedBox(width: 6),
+                const Text(
+                  "Volver",
+                  style: TextStyle(color: AppColors.primaryPurple, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.lightPurpleBackground,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.auto_awesome,
+                  color: AppColors.primaryPurple,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                "AstrhoApp",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primaryPurple,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 48),
+        ],
+      ),
+    );
   }
 
   @override
@@ -111,193 +168,201 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     final email = args?['email'] as String? ?? '';
 
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0XFF9D26F2), Color(0XFFE9418C)],
-          ),
-        ),
-        child: Stack(
+      backgroundColor: AppColors.scaffoldBackground,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(25),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.lock_reset,
-                        color: Colors.white,
-                        size: 45,
-                      ),
-                    ),
-                    SizedBox(height: 20),
-                    Text(
-                      "Restablecer contraseña",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      "Ingresa nueva contraseña",
-                      style: TextStyle(color: Colors.white70, fontSize: 15),
-                    ),
-                    SizedBox(height: 10),
-                    Text(
-                      "Correo: $email",
-                      style: TextStyle(color: Colors.white70, fontSize: 14),
-                    ),
-                    SizedBox(height: 30),
-                    Container(
-                      width: 340,
-                      padding: EdgeInsets.all(25),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Nueva contraseña",
-                            style: TextStyle(fontSize: 15),
+            _topBar(),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Center(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(25),
+                          decoration: BoxDecoration(
+                            color: AppColors.lightPurpleBackground,
+                            shape: BoxShape.circle,
                           ),
-                          SizedBox(height: 5),
-                          TextField(
-                            controller: newPassCtrl,
-                            obscureText: obscureNew,
-                            decoration: InputDecoration(
-                              prefixIcon: Icon(Icons.lock_outline),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  obscureNew
-                                      ? Icons.visibility_off
-                                      : Icons.visibility,
-                                ),
-                                onPressed: () {
-                                  setState(() => obscureNew = !obscureNew);
-                                },
-                              ),
-                              hintText: "Ingresa nueva contraseña",
-                              filled: true,
-                              fillColor: Colors.grey[100],
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none,
-                              ),
-                              errorText: newPassError,
-                            ),
-                            onChanged: (value) => setState(
-                              () => newPassError = validateNewPass(value),
-                            ),
+                          child: const Icon(
+                            Icons.lock_reset,
+                            color: AppColors.primaryPurple,
+                            size: 45,
                           ),
-                          SizedBox(height: 20),
-                          Text(
-                            "Confirmar contraseña",
-                            style: TextStyle(fontSize: 15),
+                        ),
+                        const SizedBox(height: 24),
+                        const Text(
+                          "Restablecer contraseña",
+                          style: TextStyle(
+                            color: AppColors.textDark,
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
                           ),
-                          SizedBox(height: 5),
-                          TextField(
-                            controller: confirmPassCtrl,
-                            obscureText: obscureConfirm,
-                            decoration: InputDecoration(
-                              prefixIcon: Icon(Icons.lock_outline),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  obscureConfirm
-                                      ? Icons.visibility_off
-                                      : Icons.visibility,
-                                ),
-                                onPressed: () {
-                                  setState(
-                                    () => obscureConfirm = !obscureConfirm,
-                                  );
-                                },
-                              ),
-                              hintText: "Confirma nueva contraseña",
-                              filled: true,
-                              fillColor: Colors.grey[100],
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none,
-                              ),
-                              errorText: confirmPassError,
-                            ),
-                            onChanged: (value) => setState(
-                              () =>
-                                  confirmPassError = validateConfirmPass(value),
-                            ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          "Ingresa nueva contraseña",
+                          style: TextStyle(color: AppColors.textGray, fontSize: 15),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          "Correo: $email",
+                          style: TextStyle(color: AppColors.textGray, fontSize: 14),
+                        ),
+                        const SizedBox(height: 32),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: AppColors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: AppColors.borderLight),
                           ),
-                          SizedBox(height: 20),
-                          GestureDetector(
-                            onTap: loading ? null : resetPassword,
-                            child: Container(
-                              width: double.infinity,
-                              padding: EdgeInsets.symmetric(vertical: 15),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Color(0xFF9D26F2),
-                                    Color(0xFFE9418C),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              child: Center(
-                                child: loading
-                                    ? CircularProgressIndicator(
-                                        color: Colors.white,
-                                      )
-                                    : Text(
-                                        "Cambiar contraseña",
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                              ),
-                            ),
-                          ),
-                          SizedBox(height: 20),
-                          Center(
-                            child: GestureDetector(
-                              onTap: () => Navigator.pop(context),
-                              child: Text(
-                                "Volver",
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                "Nueva contraseña",
                                 style: TextStyle(
-                                  color: Color(0xFF9D26F2),
-                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.textDark,
                                 ),
                               ),
-                            ),
+                              const SizedBox(height: 8),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: AppColors.scaffoldBackground,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: AppColors.borderLight),
+                                ),
+                                child: TextField(
+                                  controller: newPassCtrl,
+                                  obscureText: obscureNew,
+                                  decoration: InputDecoration(
+                                    prefixIcon: const Icon(Icons.lock_outline, color: AppColors.textGray),
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        obscureNew
+                                            ? Icons.visibility_off
+                                            : Icons.visibility,
+                                        color: AppColors.textGray,
+                                      ),
+                                      onPressed: () {
+                                        setState(() => obscureNew = !obscureNew);
+                                      },
+                                    ),
+                                    hintText: "Ingresa nueva contraseña",
+                                    hintStyle: const TextStyle(color: AppColors.textGray),
+                                    border: InputBorder.none,
+                                    contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                                    errorText: newPassError,
+                                  ),
+                                  onChanged: (value) => setState(
+                                    () => newPassError = validateNewPass(value),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              const Text(
+                                "Confirmar contraseña",
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.textDark,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: AppColors.scaffoldBackground,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: AppColors.borderLight),
+                                ),
+                                child: TextField(
+                                  controller: confirmPassCtrl,
+                                  obscureText: obscureConfirm,
+                                  decoration: InputDecoration(
+                                    prefixIcon: const Icon(Icons.lock_outline, color: AppColors.textGray),
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        obscureConfirm
+                                            ? Icons.visibility_off
+                                            : Icons.visibility,
+                                        color: AppColors.textGray,
+                                      ),
+                                      onPressed: () {
+                                        setState(
+                                          () => obscureConfirm = !obscureConfirm,
+                                        );
+                                      },
+                                    ),
+                                    hintText: "Confirma nueva contraseña",
+                                    hintStyle: const TextStyle(color: AppColors.textGray),
+                                    border: InputBorder.none,
+                                    contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                                    errorText: confirmPassError,
+                                  ),
+                                  onChanged: (value) => setState(
+                                    () =>
+                                        confirmPassError = validateConfirmPass(value),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 56,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primaryPurple,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                  onPressed: loading ? null : resetPassword,
+                                  child: loading
+                                      ? const SizedBox(
+                                          height: 20,
+                                          width: 20,
+                                          child: CircularProgressIndicator(
+                                            color: AppColors.white,
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Text(
+                                          "Cambiar contraseña",
+                                          style: TextStyle(
+                                            color: AppColors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              Center(
+                                child: GestureDetector(
+                                  onTap: () => Navigator.pop(context),
+                                  child: const Text(
+                                    "Volver",
+                                    style: TextStyle(
+                                      color: AppColors.primaryPurple,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: 20,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Text(
-                  "© 2025 Todos los derechos reservados",
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
                 ),
               ),
             ),

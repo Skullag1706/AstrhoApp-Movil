@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/services/auth_service.dart';
+import 'package:astrhoapp/core/utils/colors.dart';
 
 class ConfirmCodePage extends StatefulWidget {
   const ConfirmCodePage({super.key});
@@ -62,12 +63,14 @@ class _ConfirmCodePageState extends State<ConfirmCodePage> {
 
     if (token == null) {
       setState(() => loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Token no encontrado"),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Token no encontrado"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
       return;
     }
 
@@ -82,28 +85,84 @@ class _ConfirmCodePageState extends State<ConfirmCodePage> {
 
       if (validationResult != null && validationResult['valid'] == true) {
         final resetToken = validationResult['resetToken'];
-        Navigator.pushNamed(
-          context,
-          '/reset-password',
-          arguments: {"resetToken": resetToken, "email": email},
-        );
+        if (mounted) {
+          Navigator.pushNamed(
+            context,
+            '/reset-password',
+            arguments: {"resetToken": resetToken, "email": email},
+          );
+        }
       } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Código inválido"),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() => loading = false);
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Código inválido"),
+            content: Text("Error de conexión: $e"),
             backgroundColor: Colors.red,
           ),
         );
       }
-    } catch (e) {
-      setState(() => loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Error de conexión: $e"),
-          backgroundColor: Colors.red,
-        ),
-      );
     }
+  }
+
+  Widget _topBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Row(
+              children: [
+                const Icon(Icons.arrow_back, color: AppColors.primaryPurple),
+                const SizedBox(width: 6),
+                const Text(
+                  "Volver",
+                  style: TextStyle(color: AppColors.primaryPurple, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.lightPurpleBackground,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.auto_awesome,
+                  color: AppColors.primaryPurple,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                "AstrhoApp",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primaryPurple,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 48),
+        ],
+      ),
+    );
   }
 
   @override
@@ -113,163 +172,168 @@ class _ConfirmCodePageState extends State<ConfirmCodePage> {
     final email = args?['email'] as String? ?? '';
 
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0XFF9D26F2), Color(0XFFE9418C)],
-          ),
-        ),
-        child: Stack(
+      backgroundColor: AppColors.scaffoldBackground,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(25),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.key, color: Colors.white, size: 45),
-                  ),
-                  SizedBox(height: 20),
-                  Text(
-                    "Confirmar código",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    "Ingresa el código enviado a tu correo",
-                    style: TextStyle(color: Colors.white70, fontSize: 15),
-                  ),
-                  SizedBox(height: 10),
-                  Text(
-                    email,
-                    style: TextStyle(color: Colors.white70, fontSize: 14),
-                  ),
-                  SizedBox(height: 30),
-                  Container(
-                    width: 340,
-                    padding: EdgeInsets.all(25),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(25),
-                    ),
+            _topBar(),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Center(
+                  child: SingleChildScrollView(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          "Código de seguridad",
-                          style: TextStyle(fontSize: 15),
-                        ),
-                        SizedBox(height: 5),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: List.generate(6, (index) {
-                            return Container(
-                              width: 40,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[100],
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: codeError != null
-                                      ? Colors.red
-                                      : Colors.grey[300]!,
-                                  width: 1,
-                                ),
-                              ),
-                              child: TextField(
-                                controller: codeControllers[index],
-                                focusNode: focusNodes[index],
-                                textAlign: TextAlign.center,
-                                keyboardType: TextInputType.number,
-                                maxLength: 1,
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                decoration: InputDecoration(
-                                  counterText: '',
-                                  border: InputBorder.none,
-                                ),
-                                onChanged: (value) =>
-                                    _onCodeChanged(index, value),
-                              ),
-                            );
-                          }),
-                        ),
-                        if (codeError != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8.0),
-                            child: Text(
-                              codeError!,
-                              style: TextStyle(color: Colors.red, fontSize: 12),
-                            ),
+                        Container(
+                          padding: const EdgeInsets.all(25),
+                          decoration: BoxDecoration(
+                            color: AppColors.lightPurpleBackground,
+                            shape: BoxShape.circle,
                           ),
-                        SizedBox(height: 20),
-                        GestureDetector(
-                          onTap: loading ? null : confirmCode,
-                          child: Container(
-                            width: double.infinity,
-                            padding: EdgeInsets.symmetric(vertical: 15),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [Color(0xFF9D26F2), Color(0xFFE9418C)],
+                          child: const Icon(
+                            Icons.key,
+                            color: AppColors.primaryPurple,
+                            size: 45,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        const Text(
+                          "Confirmar código",
+                          style: TextStyle(
+                            color: AppColors.textDark,
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          "Ingresa el código enviado a tu correo",
+                          style: TextStyle(color: AppColors.textGray, fontSize: 15),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          email,
+                          style: TextStyle(color: AppColors.textGray, fontSize: 14),
+                        ),
+                        const SizedBox(height: 32),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: AppColors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: AppColors.borderLight),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                "Código de seguridad",
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.textDark,
+                                ),
                               ),
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            child: Center(
-                              child: loading
-                                  ? CircularProgressIndicator(
-                                      color: Colors.white,
-                                    )
-                                  : Text(
-                                      "Confirmar código",
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
+                              const SizedBox(height: 16),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                children: List.generate(6, (index) {
+                                  return Container(
+                                    width: 48,
+                                    height: 56,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.scaffoldBackground,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: codeError != null
+                                            ? Colors.red
+                                            : AppColors.borderLight,
+                                        width: 1,
                                       ),
                                     ),
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 20),
-                        Center(
-                          child: GestureDetector(
-                            onTap: () => Navigator.pop(context),
-                            child: Text(
-                              "Volver",
-                              style: TextStyle(
-                                color: Color(0xFF9D26F2),
-                                fontWeight: FontWeight.w600,
+                                    child: TextField(
+                                      controller: codeControllers[index],
+                                      focusNode: focusNodes[index],
+                                      textAlign: TextAlign.center,
+                                      keyboardType: TextInputType.number,
+                                      maxLength: 1,
+                                      style: const TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textDark,
+                                      ),
+                                      decoration: const InputDecoration(
+                                        counterText: '',
+                                        border: InputBorder.none,
+                                        contentPadding: EdgeInsets.symmetric(vertical: 12),
+                                      ),
+                                      onChanged: (value) =>
+                                          _onCodeChanged(index, value),
+                                    ),
+                                  );
+                                }),
                               ),
-                            ),
+                              if (codeError != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 12.0),
+                                  child: Text(
+                                    codeError!,
+                                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                                  ),
+                                ),
+                              const SizedBox(height: 24),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 56,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primaryPurple,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                  onPressed: loading ? null : confirmCode,
+                                  child: loading
+                                      ? const SizedBox(
+                                          height: 20,
+                                          width: 20,
+                                          child: CircularProgressIndicator(
+                                            color: AppColors.white,
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Text(
+                                          "Confirmar código",
+                                          style: TextStyle(
+                                            color: AppColors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              Center(
+                                child: GestureDetector(
+                                  onTap: () => Navigator.pop(context),
+                                  child: const Text(
+                                    "Volver",
+                                    style: TextStyle(
+                                      color: AppColors.primaryPurple,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
-              ),
-            ),
-            Positioned(
-              bottom: 20,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Text(
-                  "© 2025 Todos los derechos reservados",
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
                 ),
               ),
             ),

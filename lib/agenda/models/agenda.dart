@@ -75,12 +75,29 @@ class Agenda {
     // Manejar cliente y empleado (pueden ser objetos o nombres directos)
     String? nombreClienteValue = json['clienteNombre'] ??
         json['nombreCliente'] ??
-        json['nombre_cliente'] ??
-        json['cliente']?['nombre'];
+        json['nombre_cliente'];
+    // Solo intentar acceder a ['nombre'] si cliente es un Map
+    final clienteField = json['cliente'];
+    if (clienteField != null) {
+      if (clienteField is Map<String, dynamic>) {
+        nombreClienteValue ??= clienteField['nombre']?.toString();
+      } else {
+        nombreClienteValue ??= clienteField.toString();
+      }
+    }
+
     String? nombreEmpleadoValue = json['empleadoNombre'] ??
         json['nombreEmpleado'] ??
-        json['nombre_empleado'] ??
-        json['empleado']?['nombre'];
+        json['nombre_empleado'];
+    // Solo intentar acceder a ['nombre'] si empleado es un Map
+    final empleadoField = json['empleado'];
+    if (empleadoField != null) {
+      if (empleadoField is Map<String, dynamic>) {
+        nombreEmpleadoValue ??= empleadoField['nombre']?.toString();
+      } else {
+        nombreEmpleadoValue ??= empleadoField.toString();
+      }
+    }
 
     // Si servicios es un array de strings o de objetos
     List<Servicio>? serviciosList;
@@ -113,26 +130,18 @@ class Agenda {
       agendaId: json['agendaId'] ?? json['agenda_id'],
       documentoCliente: json['documentoCliente']?.toString() ??
           json['documento_cliente']?.toString() ??
-          json['cliente']?['documentoCliente']?.toString() ??
           '',
       documentoEmpleado: json['documentoEmpleado']?.toString() ??
           json['documento_empleado']?.toString() ??
-          json['empleado']?['documentoEmpleado']?.toString() ??
           '',
       ventaId: json['ventaId']?.toString() ?? json['venta_id']?.toString(),
-      fechaCita: json['fechaCita'] != null
-          ? DateTime.parse(json['fechaCita'])
-          : json['fecha_cita'] != null
-              ? DateTime.parse(json['fecha_cita'])
-              : DateTime.now(),
+      fechaCita: DateTime.tryParse(json['fechaCita']?.toString() ?? '') ??
+          DateTime.tryParse(json['fecha_cita']?.toString() ?? '') ??
+          DateTime.now(),
       horaInicio:
           json['horaInicio']?.toString() ?? json['hora_inicio']?.toString() ?? '',
-      estadoId: estadoIdValue is int
-          ? estadoIdValue
-          : (int.tryParse(estadoIdValue?.toString() ?? '') ?? 0),
-      metodopagoId: metodoPagoIdValue is int
-          ? metodoPagoIdValue
-          : (int.tryParse(metodoPagoIdValue?.toString() ?? '') ?? 0),
+      estadoId: estadoIdValue is int ? estadoIdValue : (int.tryParse(estadoIdValue?.toString() ?? '') ?? 0),
+      metodopagoId: metodoPagoIdValue is int ? metodoPagoIdValue : (int.tryParse(metodoPagoIdValue?.toString() ?? '') ?? 0),
       observaciones: json['observaciones']?.toString(),
       nombreCliente: nombreClienteValue?.toString(),
       nombreEmpleado: nombreEmpleadoValue?.toString(),
@@ -190,6 +199,7 @@ class Servicio {
   final double precio;
   final int duracion;
   final bool estado;
+  final String? imagen;
 
   Servicio({
     required this.servicioId,
@@ -198,6 +208,7 @@ class Servicio {
     required this.precio,
     required this.duracion,
     required this.estado,
+    this.imagen,
   });
 
   factory Servicio.fromJson(Map<String, dynamic> json) {
@@ -217,13 +228,30 @@ class Servicio {
       }
     }
     
+    final duracionValue = json['duracion'] ?? json['duración'] ?? json['duracionMinutos'] ?? json['duracion_minutos'];
+    int duracionInt = 0;
+    if (duracionValue != null) {
+      if (duracionValue is int) {
+        duracionInt = duracionValue;
+      } else if (duracionValue is double) {
+        duracionInt = duracionValue.toInt();
+      } else if (duracionValue is String) {
+        try {
+          duracionInt = int.parse(duracionValue);
+        } catch (_) {
+          duracionInt = 0;
+        }
+      }
+    }
+    
     return Servicio(
       servicioId: json['servicioId'] ?? json['servicio_id'] ?? 0,
       nombre: json['nombre']?.toString() ?? '',
       descripcion: json['descripcion']?.toString(),
       precio: precioDouble,
-      duracion: json['duracion'] ?? json['duracion'] ?? 0,
+      duracion: duracionInt,
       estado: json['estado'] is bool ? json['estado'] : (json['estado'] == 1 || json['estado'] == 'true' || json['estado'] == 'True'),
+      imagen: json['imagen']?.toString() ?? json['imagenUrl']?.toString() ?? json['imagen_url']?.toString(),
     );
   }
 
@@ -235,6 +263,7 @@ class Servicio {
       'precio': precio,
       'duracion': duracion,
       'estado': estado,
+      'imagen': imagen,
     };
   }
 }
@@ -412,6 +441,95 @@ class Empleado {
           json['dirección']?.toString() ??
           json['direccion']?.toString() ??
           json['dirección_empleado']?.toString(),
+    );
+  }
+}
+
+class Horario {
+  final int horarioId;
+  final String diaSemana;
+  final String horaInicio;
+  final String horaFin;
+  final bool estado;
+
+  Horario({
+    required this.horarioId,
+    required this.diaSemana,
+    required this.horaInicio,
+    required this.horaFin,
+    required this.estado,
+  });
+
+  factory Horario.fromJson(Map<String, dynamic> json) {
+    // Obtener horas con valores por defecto en caso de error
+    String horaInicioStr = json['horaInicio']?.toString() ?? json['hora_inicio']?.toString() ?? '09:00:00';
+    String horaFinStr = json['horaFin']?.toString() ?? json['hora_fin']?.toString() ?? '18:00:00';
+    
+    // Si la hora está vacía, usar valores por defecto
+    if (horaInicioStr.isEmpty) horaInicioStr = '09:00:00';
+    if (horaFinStr.isEmpty) horaFinStr = '18:00:00';
+    
+    return Horario(
+      horarioId: json['horarioId'] ?? json['horario_id'] ?? 0,
+      diaSemana: json['diaSemana']?.toString() ?? json['dia_semana']?.toString() ?? 'lunes',
+      horaInicio: horaInicioStr,
+      horaFin: horaFinStr,
+      estado: json['estado'] is bool ? json['estado'] : (json['estado'] == 1 || json['estado'] == 'true'),
+    );
+  }
+}
+
+class HorarioEmpleado {
+  final int horarioEmpleadoId;
+  final String documentoEmpleado;
+  final int horarioId;
+  final bool estado;
+  final Horario? horario;
+
+  HorarioEmpleado({
+    required this.horarioEmpleadoId,
+    required this.documentoEmpleado,
+    required this.horarioId,
+    required this.estado,
+    this.horario,
+  });
+
+  factory HorarioEmpleado.fromJson(Map<String, dynamic> json) {
+    print('Parsing HorarioEmpleado from: $json');
+    
+    Horario? horarioObj;
+    
+    // Intentar diferentes formas de encontrar el horario
+    if (json['horario'] != null && json['horario'] is Map<String, dynamic>) {
+      horarioObj = Horario.fromJson(json['horario']);
+    } else if (json['Horario'] != null && json['Horario'] is Map<String, dynamic>) {
+      horarioObj = Horario.fromJson(json['Horario']);
+    } else {
+      // Si el horario viene en la misma estructura (sin anidamiento)
+      print('Horario no está anidado, intentando leer directamente');
+      try {
+        horarioObj = Horario.fromJson(json);
+      } catch (e) {
+        print('Error creando horario desde json principal: $e');
+        // Horario por defecto si todo falla
+        horarioObj = Horario(
+          horarioId: json['horarioId'] ?? json['horario_id'] ?? 0,
+          diaSemana: json['diaSemana']?.toString() ?? json['dia_semana']?.toString() ?? 'lunes',
+          horaInicio: json['horaInicio']?.toString() ?? json['hora_inicio']?.toString() ?? '09:00:00',
+          horaFin: json['horaFin']?.toString() ?? json['hora_fin']?.toString() ?? '18:00:00',
+          estado: true,
+        );
+      }
+    }
+
+    print('HorarioEmpleado creado - horario: ${horarioObj.diaSemana}, ${horarioObj.horaInicio} - ${horarioObj.horaFin}');
+
+    return HorarioEmpleado(
+      horarioEmpleadoId: json['horarioEmpleadoId'] ?? json['horario_empleado_id'] ?? 0,
+      documentoEmpleado: json['documentoEmpleado']?.toString() ?? json['documento_empleado']?.toString() ?? '',
+      horarioId: json['horarioId'] ?? json['horario_id'] ?? 0,
+      estado: json['estado'] is bool ? json['estado'] : (json['estado'] == 1 || json['estado'] == 'true'),
+      horario: horarioObj,
     );
   }
 }

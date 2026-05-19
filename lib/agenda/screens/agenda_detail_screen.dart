@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/agenda.dart';
+import 'appointment_flow_screen.dart';
 
 import 'package:astrhoapp/core/services/api_service.dart';
 import 'package:astrhoapp/core/utils/colors.dart';
@@ -29,18 +30,21 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
   List<Empleado> _empleadosCatalog = [];
   Cliente? _currentUserClient;
   bool _isLoadingPrices = true;
+  bool _isLoading = false;
+  late Agenda _currentAgenda;
 
   @override
   void initState() {
     super.initState();
     _apiService = ApiService(token: widget.token);
+    _currentAgenda = widget.agenda;
     _loadInitialData();
   }
 
   Future<void> _loadInitialData() async {
     // Cargar servicios
     try {
-      final servicios = await _apiService.getServicios();
+      final servicios = await _apiService.getServiciosLegacy();
       if (mounted) {
         setState(() {
           _serviciosCatalog = servicios;
@@ -75,7 +79,6 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
     }
 
     if (mounted) {
-      // Cargar nombre del cliente si no viene en el usuario logueado
       // Cargar nombre del cliente si no viene en el usuario logueado
       if (widget.user != null &&
           widget.user!['rol']?.toString().toLowerCase() == 'cliente') {
@@ -123,11 +126,11 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
     if (widget.user != null &&
         widget.user!['rol']?.toString().toLowerCase() == 'cliente') {
       // 1. Si el documento coincide O es vacío (caso de bug en API), asumimos que es el usuario
-      if (widget.agenda.documentoCliente == documento || documento.isEmpty) {
+      if (_currentAgenda.documentoCliente == documento || documento.isEmpty) {
         // A. Nombre explícito en agenda
-        if (widget.agenda.nombreCliente != null &&
-            widget.agenda.nombreCliente!.isNotEmpty) {
-          return widget.agenda.nombreCliente!;
+        if (_currentAgenda.nombreCliente != null &&
+            _currentAgenda.nombreCliente!.isNotEmpty) {
+          return _currentAgenda.nombreCliente!;
         }
 
         // B. Cliente recuperado por ID de usuario (Fallback fuerte)
@@ -155,9 +158,9 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
 
     // Escenario General
     if (_clientesCatalog.isEmpty) {
-      if (widget.agenda.nombreCliente != null &&
-          widget.agenda.nombreCliente!.isNotEmpty) {
-        return widget.agenda.nombreCliente!;
+      if (_currentAgenda.nombreCliente != null &&
+          _currentAgenda.nombreCliente!.isNotEmpty) {
+        return _currentAgenda.nombreCliente!;
       }
       return documento;
     }
@@ -168,18 +171,16 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
       );
       return cliente.nombre;
     } catch (e) {
-      if (widget.agenda.nombreCliente != null &&
-          widget.agenda.nombreCliente!.isNotEmpty) {
-        return widget.agenda.nombreCliente!;
+      if (_currentAgenda.nombreCliente != null &&
+          _currentAgenda.nombreCliente!.isNotEmpty) {
+        return _currentAgenda.nombreCliente!;
       }
       return documento;
     }
   }
 
   String _getPaymentMethodName() {
-    // Simplemente mostrar el nombreMetodoPago que viene en el objeto agenda
-    // Si está vacío o es null, mostrar "No especificado"
-    final nombre = widget.agenda.nombreMetodoPago;
+    final nombre = _currentAgenda.nombreMetodoPago;
 
     if (nombre != null && nombre.isNotEmpty && nombre != 'No especificado') {
       return nombre;
@@ -201,10 +202,8 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
   }
 
   double _getRealPrice(Servicio servicioAgenda) {
-    // Si el servicio ya trae precio > 0, usarlo
     if (servicioAgenda.precio > 0) return servicioAgenda.precio;
 
-    // Si no, buscar en el catálogo por ID
     if (_serviciosCatalog.isNotEmpty) {
       try {
         final servicioFull = _serviciosCatalog.firstWhere(
@@ -212,7 +211,6 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
         );
         return servicioFull.precio;
       } catch (e) {
-        // No encontrado por ID, intentar por nombre
         try {
           final servicioFull = _serviciosCatalog.firstWhere(
             (s) =>
@@ -229,12 +227,167 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
   }
 
   double get _totalCosto {
-    if (widget.agenda.servicios == null) return 0;
-    return widget.agenda.servicios!.fold(
+    if (_currentAgenda.servicios == null) return 0;
+    return _currentAgenda.servicios!.fold(
       0.0,
       (sum, s) => sum + _getRealPrice(s),
     );
   }
+
+  // Métodos para cambiar el estado
+  Future<void> _confirmarCita() async {
+    if (_currentAgenda.agendaId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se puede identificar la cita')),
+      );
+      return;
+    }
+    
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      final agendaActualizada = await _apiService.confirmarCita(_currentAgenda.agendaId!);
+      if (mounted) {
+        setState(() {
+          _currentAgenda = agendaActualizada;
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cita confirmada exitosamente')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _completarCita() async {
+    if (_currentAgenda.agendaId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se puede identificar la cita')),
+      );
+      return;
+    }
+    
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      final agendaActualizada = await _apiService.completarCita(_currentAgenda.agendaId!);
+      if (mounted) {
+        setState(() {
+          _currentAgenda = agendaActualizada;
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cita completada exitosamente')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _cancelarCita() async {
+    if (_currentAgenda.agendaId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se puede identificar la cita')),
+      );
+      return;
+    }
+    
+    final confirmacion = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancelar Cita'),
+        content: const Text('¿Estás seguro de que quieres cancelar esta cita?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('No'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Sí'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmacion == true) {
+      setState(() {
+        _isLoading = true;
+      });
+      try {
+        final agendaActualizada = await _apiService.cancelarCita(_currentAgenda.agendaId!);
+        if (mounted) {
+          setState(() {
+            _currentAgenda = agendaActualizada;
+            _isLoading = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Cita cancelada exitosamente')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  // Método para reprogramar cita
+  void _reprogramarCita() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AppointmentFlowScreen(
+          token: widget.token,
+          user: widget.user,
+          agendaToEdit: _currentAgenda,
+        ),
+      ),
+    ).then((result) {
+      if (result != null && result is Agenda) {
+        setState(() {
+          _currentAgenda = result;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cita reprogramada exitosamente')),
+        );
+      }
+    });
+  }
+
+  // Verificar rol
+  bool get _isCliente => widget.user != null && widget.user!['rol']?.toString().toLowerCase() == 'cliente';
+
+  // Verificar estados
+  bool get _estaPendiente => _currentAgenda.nombreEstado?.toLowerCase().contains('pendiente') == true;
+  bool get _estaConfirmado => _currentAgenda.nombreEstado?.toLowerCase().contains('confirmado') == true;
+  bool get _estaCompletado => _currentAgenda.nombreEstado?.toLowerCase().contains('completado') == true;
+  bool get _estaCancelado => _currentAgenda.nombreEstado?.toLowerCase().contains('cancelado') == true;
 
   @override
   Widget build(BuildContext context) {
@@ -246,7 +399,7 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
             children: [
               AppHeader(
                 title: 'Detalle de Cita',
-                onBackPressed: () => Navigator.pop(context),
+                onBackPressed: () => Navigator.pop(context, _currentAgenda),
               ),
               Expanded(
                 child: Container(
@@ -301,13 +454,11 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        widget.agenda.servicios != null &&
-                                                widget
-                                                    .agenda
+                                        _currentAgenda.servicios != null &&
+                                                _currentAgenda
                                                     .servicios!
                                                     .isNotEmpty
-                                            ? widget
-                                                  .agenda
+                                            ? _currentAgenda
                                                   .servicios!
                                                   .first
                                                   .nombre
@@ -325,19 +476,19 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
                                           vertical: 6,
                                         ),
                                         decoration: BoxDecoration(
-                                          color:
-                                              widget.agenda.nombreEstado
-                                                      ?.toLowerCase()
-                                                      .contains('confirmado') ==
-                                                  true
+                                          color: _estaConfirmado
                                               ? AppColors.confirmedBlue
-                                              : AppColors.pendingOrange,
+                                              : _estaCompletado
+                                                  ? Colors.green
+                                                  : _estaCancelado
+                                                      ? Colors.red
+                                                      : AppColors.pendingOrange,
                                           borderRadius: BorderRadius.circular(
                                             20,
                                           ),
                                         ),
                                         child: Text(
-                                          widget.agenda.nombreEstado ??
+                                          _currentAgenda.nombreEstado ??
                                               'Sin estado',
                                           style: const TextStyle(
                                             color: AppColors.white,
@@ -357,20 +508,20 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
                               label: 'Fecha',
                               value: DateFormat(
                                 'yyyy-MM-dd',
-                              ).format(widget.agenda.fechaCita),
+                              ).format(_currentAgenda.fechaCita),
                             ),
                             const SizedBox(height: 16),
                             _buildDetailRow(
                               icon: Icons.access_time,
                               label: 'Hora',
-                              value: widget.agenda.horaInicio,
+                              value: _currentAgenda.horaInicio,
                             ),
                             const SizedBox(height: 16),
                             _buildDetailRow(
                               icon: Icons.person,
                               label: 'Cliente',
                               value: _getClientName(
-                                widget.agenda.documentoCliente,
+                                _currentAgenda.documentoCliente,
                               ),
                             ),
                             const SizedBox(height: 16),
@@ -378,7 +529,7 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
                               icon: Icons.badge,
                               label: 'Empleado',
                               value: _getEmployeeName(
-                                widget.agenda.documentoEmpleado,
+                                _currentAgenda.documentoEmpleado,
                               ),
                             ),
                             const SizedBox(height: 16),
@@ -387,17 +538,17 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
                               label: 'Método de Pago',
                               value: _getPaymentMethodName(),
                             ),
-                            if (widget.agenda.observaciones != null &&
-                                widget.agenda.observaciones!.isNotEmpty) ...[
+                            if (_currentAgenda.observaciones != null &&
+                                _currentAgenda.observaciones!.isNotEmpty) ...[
                               const SizedBox(height: 16),
                               _buildDetailRow(
                                 icon: Icons.note,
                                 label: 'Observaciones',
-                                value: widget.agenda.observaciones!,
+                                value: _currentAgenda.observaciones!,
                               ),
                             ],
-                            if (widget.agenda.servicios != null &&
-                                widget.agenda.servicios!.isNotEmpty) ...[
+                            if (_currentAgenda.servicios != null &&
+                                _currentAgenda.servicios!.isNotEmpty) ...[
                               const SizedBox(height: 24),
                               const Text(
                                 'Servicios:',
@@ -408,7 +559,7 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
                                 ),
                               ),
                               const SizedBox(height: 12),
-                              ...widget.agenda.servicios!.map(
+                              ..._currentAgenda.servicios!.map(
                                 (servicio) => Padding(
                                   padding: const EdgeInsets.only(bottom: 8),
                                   child: Row(
@@ -467,6 +618,95 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
                           ],
                         ),
                       ),
+                      const SizedBox(height: 24),
+                      // Botones de acción
+                      if (!_estaCancelado && !_estaCompletado) ...[
+                        if (!_isCliente && _estaPendiente) ...[
+                          SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.confirmedBlue,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed: _isLoading ? null : _confirmarCita,
+                              child: _isLoading
+                                  ? const CircularProgressIndicator(color: Colors.white)
+                                  : const Text(
+                                      'Confirmar Cita',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        if ((_estaPendiente || _estaConfirmado) && !_isCliente) ...[
+                          SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed: _isLoading ? null : _completarCita,
+                              child: _isLoading
+                                  ? const CircularProgressIndicator(color: Colors.white)
+                                  : const Text(
+                                      'Completar Cita',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        if (_estaPendiente) ...[
+                          SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: AppColors.primaryPurple),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed: _isLoading ? null : _reprogramarCita,
+                              child: _isLoading
+                                  ? const CircularProgressIndicator()
+                                  : const Text(
+                                      'Reprogramar Cita',
+                                      style: TextStyle(color: AppColors.primaryPurple),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Colors.red),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: _isLoading ? null : _cancelarCita,
+                            child: _isLoading
+                                ? const CircularProgressIndicator(color: Colors.red)
+                                : const Text(
+                                    'Cancelar Cita',
+                                    style: TextStyle(color: Colors.red),
+                                  ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

@@ -1,208 +1,399 @@
 import 'package:flutter/material.dart';
-import 'profile_page.dart';
+import 'package:astrhoapp/core/utils/colors.dart';
+import 'package:astrhoapp/agenda/screens/appointment_flow_screen.dart';
+import 'package:astrhoapp/agenda/screens/mis_citas_screen.dart';
+import 'package:astrhoapp/services/screens/services_page.dart';
+import 'package:astrhoapp/auth/screens/profile_page.dart';
 
 class AsistentePage extends StatefulWidget {
-  const AsistentePage({super.key});
+  final Map<dynamic, dynamic>? user;
+
+  const AsistentePage({super.key, this.user});
 
   @override
-  _AsistentePageState createState() => _AsistentePageState();
+  State<AsistentePage> createState() => _AsistentePageState();
 }
 
 class _AsistentePageState extends State<AsistentePage> {
   Map<dynamic, dynamic>? user;
+  bool loading = false;
+  int _currentPageIndex = 0;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final PageController _pageController = PageController(initialPage: 0);
+  bool _isInitialized = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    user = ModalRoute.of(context)!.settings.arguments as Map?;
+    if (!_isInitialized) {
+      if (widget.user != null) {
+        user = widget.user;
+      } else {
+        final args = ModalRoute.of(context)?.settings.arguments;
+        if (args != null && args is Map) {
+          user = args;
+        }
+      }
+      _isInitialized = true;
+    }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      drawer: _buildDrawer(context),
-      appBar: PreferredSize(
-        preferredSize: Size.fromHeight(60),
-        child: AppBar(
-          elevation: 0,
-          backgroundColor: Colors.transparent,
-          flexibleSpace: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0XFF9D26F2), Color(0XFFE9418C)],
-              ),
-            ),
-          ),
-          title: Row(
-            children: const [
-              Icon(Icons.auto_awesome, size: 22),
-              SizedBox(width: 8),
-              Text("AstrhoApp"),
-            ],
-          ),
-        ),
-      ),
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0XFF9D26F2), Color(0XFFE9418C)],
-          ),
-        ),
-        child: Center(
-          child: Container(
-            margin: const EdgeInsets.all(20),
-            padding: const EdgeInsets.all(25),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(25),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.purple.shade50,
-                  ),
-                  child: const Icon(
-                    Icons.support_agent,
-                    color: Color(0xFF7926F7),
-                    size: 40,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  "¡Bienvenido Asistente!",
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF7926F7),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  "Panel de asistencia de AstrhoApp",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  "Usuario: ${user?["nombreUsuario"] ?? "N/A"}",
-                  style: TextStyle(fontSize: 16),
-                ),
-                Text(
-                  "Rol: ${user?["rolNombre"] ?? "Asistente"}",
-                  style: TextStyle(fontSize: 16),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// 🔹 Drawer (Menú lateral)
-  Widget _buildDrawer(BuildContext context) {
-    return Drawer(
+  Widget _buildHomeScreen() {
+    return SingleChildScrollView(
       child: Column(
         children: [
+          _topBar(),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-            width: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF7926F7), Color(0xFFF63D77)],
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: const [
-                    Icon(Icons.auto_awesome, color: Colors.white),
-                    SizedBox(width: 10),
-                    Text(
-                      "AstrhoApp\nPanel Asistente",
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ],
+                const SizedBox(height: 20),
+                Text(
+                  "¡Hola, ${user?['nombre'] ?? 'Asistente'}!",
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textDark,
+                  ),
                 ),
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.close, color: Colors.white),
+                const SizedBox(height: 8),
+                Text(
+                  "Panel de Asistencia",
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: AppColors.textGray,
+                  ),
                 ),
+                const SizedBox(height: 32),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: AppColors.borderLight),
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.lightPurpleBackground,
+                        ),
+                        child: const Icon(
+                          Icons.support_agent,
+                          color: AppColors.primaryPurple,
+                          size: 40,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        "¡Bienvenido Asistente!",
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primaryPurple,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        "Gestiona servicios, citas y clientes",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textGray,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => AppointmentFlowScreen(
+                                  user: user,
+                                  token: user?['token']?.toString(),
+                                ),
+                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryPurple,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            "Gestionar Citas",
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: AppColors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 40),
               ],
             ),
           ),
-          _drawerItem(
-            icon: Icons.support_agent,
-            text: "Panel Asistente",
-            selected: true,
-            onTap: () => Navigator.pop(context),
-          ),
-          _drawerItem(
-            icon: Icons.calendar_month,
-            text: "Gestión de Citas",
-            onTap: () {
-              Navigator.pushNamed(context, '/mis-citas', arguments: user);
-            },
-          ),
-          _drawerItem(
-            icon: Icons.person,
-            text: "Mi Perfil",
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ProfilePage(user: user ?? {}),
-                ),
-              );
-            },
-          ),
-          const Spacer(),
-          _drawerItem(
-            icon: Icons.logout,
-            text: "Cerrar sesión",
-            color: Colors.red,
-            onTap: () {
-              Navigator.pushReplacementNamed(context, '/');
-            },
-          ),
-          const SizedBox(height: 20),
         ],
       ),
     );
   }
 
-  Widget _drawerItem({
-    required IconData icon,
-    required String text,
-    VoidCallback? onTap,
-    bool selected = false,
-    Color? color,
-  }) {
+  Widget _topBar() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
-        color: selected ? Colors.purple.shade50 : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
+        gradient: AppColors.primaryGradient,
       ),
-      child: ListTile(
-        leading: Icon(icon, color: color ?? Color(0xFF7926F7)),
-        title: Text(
-          text,
-          style: TextStyle(
-            color: color ?? Colors.black87,
-            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-          ),
+      child: SafeArea(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.menu, color: AppColors.white),
+              onPressed: () => _scaffoldKey.currentState!.openDrawer(),
+            ),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.auto_awesome,
+                    color: AppColors.primaryPurple,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  "AstrhoApp",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.white,
+                  ),
+                ),
+              ],
+            ),
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _currentPageIndex = 3;
+                  _pageController.jumpToPage(3);
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.person,
+                  color: AppColors.primaryPurple,
+                  size: 20,
+                ),
+              ),
+            ),
+          ],
         ),
-        onTap: onTap,
       ),
+    );
+  }
+
+  Widget _buildDrawer(BuildContext context) {
+    return Drawer(
+      child: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(30),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0XFF9D26F2), Color(0XFFE9418C)],
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 40),
+                const CircleAvatar(
+                  radius: 35,
+                  backgroundColor: Colors.white,
+                  child: Icon(
+                    Icons.support_agent,
+                    size: 40,
+                    color: Color(0XFF9D26F2),
+                  ),
+                ),
+                const SizedBox(height: 15),
+                Text(
+                  user?['nombre'] ?? "Asistente",
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  user?['email'] ?? "",
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                _drawerItem(
+                  Icons.home,
+                  "Inicio",
+                  () {
+                    Navigator.pop(context);
+                    setState(() {
+                      _currentPageIndex = 0;
+                      _pageController.jumpToPage(0);
+                    });
+                  },
+                ),
+                _drawerItem(
+                  Icons.person,
+                  "Mi Perfil",
+                  () {
+                    Navigator.pop(context);
+                    setState(() {
+                      _currentPageIndex = 3;
+                      _pageController.jumpToPage(3);
+                    });
+                  },
+                ),
+                const Divider(),
+                _drawerItem(
+                  Icons.logout,
+                  "Cerrar Sesión",
+                  () {
+                    Navigator.pop(context);
+                    Navigator.pushNamedAndRemoveUntil(
+                        context, '/login', (route) => false);
+                  },
+                  color: Colors.red,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _drawerItem(IconData icon, String title, VoidCallback onTap,
+      {Color? color}) {
+    return ListTile(
+      leading: Icon(icon, color: color ?? const Color(0xFF7926F7)),
+      title: Text(title, style: TextStyle(color: color ?? Colors.black87)),
+      onTap: onTap,
+    );
+  }
+
+  Widget _bottomNav() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _navItem(Icons.home_outlined, 'Inicio', 0),
+          _navItem(Icons.auto_awesome, 'Servicios', 1),
+          _navItem(Icons.calendar_month, 'Mis Citas', 2),
+          _navItem(Icons.person_outline, 'Perfil', 3),
+        ],
+      ),
+    );
+  }
+
+  Widget _navItem(IconData icon, String label, int index) {
+    final isActive = _currentPageIndex == index;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _currentPageIndex = index;
+          _pageController.jumpToPage(index);
+        });
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: isActive ? AppColors.primaryPurple : AppColors.textGray,
+            size: 24,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: isActive ? AppColors.primaryPurple : AppColors.textGray,
+              fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      key: _scaffoldKey,
+      backgroundColor: AppColors.scaffoldBackground,
+      drawer: _buildDrawer(context),
+      body: user == null
+          ? const Center(child: CircularProgressIndicator(color: AppColors.primaryPurple))
+          : PageView(
+              controller: _pageController,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _buildHomeScreen(),
+                const ServicesPage(showBottomNav: false),
+                MisCitasScreen(
+                  user: user,
+                  token: user?['token']?.toString(),
+                  showBottomNav: false,
+                ),
+                ProfilePage(user: user!),
+              ],
+            ),
+      bottomNavigationBar: _bottomNav(),
     );
   }
 }

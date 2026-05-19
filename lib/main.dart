@@ -14,6 +14,10 @@ import 'auth/screens/profile_page.dart';
 
 // AGENDA
 import 'agenda/screens/mis_citas_screen.dart';
+import 'agenda/screens/appointment_flow_screen.dart';
+
+// SERVICES
+import 'services/screens/services_page.dart';
 
 // THEME
 import 'core/utils/colors.dart';
@@ -68,6 +72,10 @@ class MyApp extends StatelessWidget {
 
         // AGENDA
         '/mis-citas': (_) => const MisCitasScreen(),
+        '/appointment-flow': (_) => const AppointmentFlowScreen(),
+
+        // SERVICES
+        '/services': (_) => const ServicesPage(),
 
         // PERFIL
         '/profile': (_) => ProfilePage(user: const {}),

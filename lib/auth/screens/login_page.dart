@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:astrhoapp/core/utils/colors.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -20,7 +21,7 @@ class _LoginPageState extends State<LoginPage> {
     if (userCtrl.text.isEmpty || passCtrl.text.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text("Ingresa usuario y contraseña")));
+      ).showSnackBar(const SnackBar(content: Text("Ingresa usuario y contraseña")));
       return;
     }
 
@@ -69,9 +70,6 @@ class _LoginPageState extends State<LoginPage> {
 
         print('DEBUG Login: Navegando a ruta: $route');
 
-        // 🔐 AQUÍ luego guardarás el token (paso siguiente)
-        // data["token"]
-
         Navigator.pushReplacementNamed(context, route, arguments: data);
         print('DEBUG Login: Navegación completada');
       } else {
@@ -80,7 +78,7 @@ class _LoginPageState extends State<LoginPage> {
         );
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text("Credenciales inválidas")));
+        ).showSnackBar(const SnackBar(content: Text("Credenciales inválidas")));
       }
     } catch (e, stackTrace) {
       print('DEBUG Login: ERROR CAPTURADO: $e');
@@ -92,193 +90,264 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  Widget _topBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const SizedBox(width: 48),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.lightPurpleBackground,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.auto_awesome,
+                  color: AppColors.primaryPurple,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                "AstrhoApp",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primaryPurple,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 48),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset: false,
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0XFF9D26F2), Color(0XFFE9418C)],
-          ),
-        ),
-        child: Stack(
+      backgroundColor: AppColors.scaffoldBackground,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Main content centered
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // ICONO
-                  Container(
-                    padding: EdgeInsets.all(25),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.lock, color: Colors.white, size: 45),
-                  ),
-
-                  SizedBox(height: 20),
-
-                  Text(
-                    "Bienvenido",
-                    style: TextStyle(color: Colors.white, fontSize: 32),
-                  ),
-                  Text(
-                    "Inicia sesión para continuar",
-                    style: TextStyle(color: Colors.white70, fontSize: 15),
-                  ),
-
-                  SizedBox(height: 30),
-
-                  // TARJETA LOGIN
-                  Container(
-                    width: 340,
-                    padding: EdgeInsets.all(25),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(25),
-                    ),
+            _topBar(),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Center(
+                  child: SingleChildScrollView(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text("Correo", style: TextStyle(fontSize: 15)),
-                        SizedBox(height: 5),
-
-                        TextField(
-                          controller: userCtrl,
-                          decoration: InputDecoration(
-                            prefixIcon: Icon(Icons.alternate_email),
-                            hintText: "Ingresa tu correo",
-                            filled: true,
-                            fillColor: Colors.grey[100],
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
-                            ),
+                        // Logo/Icon
+                        Container(
+                          padding: const EdgeInsets.all(25),
+                          decoration: BoxDecoration(
+                            color: AppColors.lightPurpleBackground,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.lock_outline,
+                            color: AppColors.primaryPurple,
+                            size: 45,
                           ),
                         ),
 
-                        SizedBox(height: 20),
-                        Text("Contraseña", style: TextStyle(fontSize: 15)),
-                        SizedBox(height: 5),
+                        const SizedBox(height: 24),
 
-                        TextField(
-                          controller: passCtrl,
-                          obscureText: obscure,
-                          decoration: InputDecoration(
-                            prefixIcon: Icon(Icons.lock_outline),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                obscure
-                                    ? Icons.visibility_off
-                                    : Icons.visibility,
-                              ),
-                              onPressed: () {
-                                setState(() => obscure = !obscure);
-                              },
-                            ),
-                            hintText: "Ingresa tu contraseña",
-                            filled: true,
-                            fillColor: Colors.grey[100],
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
-                            ),
+                        const Text(
+                          "Bienvenido",
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textDark,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          "Inicia sesión para continuar",
+                          style: TextStyle(
+                            color: AppColors.textGray,
+                            fontSize: 15,
                           ),
                         ),
 
-                        SizedBox(height: 10),
-                        SizedBox(height: 10),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: GestureDetector(
-                            onTap: () => Navigator.pushNamed(
-                              context,
-                              '/forgot-password',
-                            ),
-                            child: Text(
-                              "¿Olvidaste tu contraseña?",
-                              style: TextStyle(
-                                color: Color(0xFF9D26F2),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                        const SizedBox(height: 32),
+
+                        // Form
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: AppColors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: AppColors.borderLight),
                           ),
-                        ),
-
-                        SizedBox(height: 20),
-
-                        // BOTÓN LOGIN
-                        GestureDetector(
-                          onTap: loading ? null : login,
-                          child: Container(
-                            width: double.infinity,
-                            padding: EdgeInsets.symmetric(vertical: 15),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [Color(0xFF9D26F2), Color(0xFFE9418C)],
-                              ),
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            child: Center(
-                              child: loading
-                                  ? CircularProgressIndicator(
-                                      color: Colors.white,
-                                    )
-                                  : Text(
-                                      "Iniciar sesión",
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 20),
-
-                        Center(
                           child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                "¿Aún no tienes cuenta?",
+                              const Text(
+                                "Correo",
                                 style: TextStyle(
-                                  color: Colors.black87,
-                                  fontSize: 14,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.textDark,
                                 ),
                               ),
-                              SizedBox(height: 10),
-                              GestureDetector(
-                                onTap: () {
-                                  Navigator.pushNamed(context, "/register");
-                                },
-                                child: Container(
-                                  width: double.infinity,
-                                  padding: EdgeInsets.symmetric(vertical: 13),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(15),
-                                    border: Border.all(
-                                      color: Color(0xFF9D26F2),
-                                      width: 2,
+                              const SizedBox(height: 8),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: AppColors.scaffoldBackground,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: AppColors.borderLight),
+                                ),
+                                child: TextField(
+                                  controller: userCtrl,
+                                  decoration: const InputDecoration(
+                                    prefixIcon: Icon(Icons.alternate_email, color: AppColors.textGray),
+                                    hintText: "Ingresa tu correo",
+                                    hintStyle: TextStyle(color: AppColors.textGray),
+                                    border: InputBorder.none,
+                                    contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(height: 20),
+                              const Text(
+                                "Contraseña",
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.textDark,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: AppColors.scaffoldBackground,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: AppColors.borderLight),
+                                ),
+                                child: TextField(
+                                  controller: passCtrl,
+                                  obscureText: obscure,
+                                  decoration: InputDecoration(
+                                    prefixIcon: const Icon(Icons.lock_outline, color: AppColors.textGray),
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        obscure
+                                            ? Icons.visibility_off
+                                            : Icons.visibility,
+                                        color: AppColors.textGray,
+                                      ),
+                                      onPressed: () {
+                                        setState(() => obscure = !obscure);
+                                      },
+                                    ),
+                                    hintText: "Ingresa tu contraseña",
+                                    hintStyle: const TextStyle(color: AppColors.textGray),
+                                    border: InputBorder.none,
+                                    contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(height: 12),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: GestureDetector(
+                                  onTap: () => Navigator.pushNamed(
+                                    context,
+                                    '/forgot-password',
+                                  ),
+                                  child: const Text(
+                                    "¿Olvidaste tu contraseña?",
+                                    style: TextStyle(
+                                      color: AppColors.primaryPurple,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
-                                  child: Center(
-                                    child: Text(
-                                      "Regístrate",
+                                ),
+                              ),
+
+                              const SizedBox(height: 28),
+
+                              // Botón login
+                              SizedBox(
+                                width: double.infinity,
+                                height: 56,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primaryPurple,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                  onPressed: loading ? null : login,
+                                  child: loading
+                                      ? const SizedBox(
+                                          height: 20,
+                                          width: 20,
+                                          child: CircularProgressIndicator(
+                                            color: AppColors.white,
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Text(
+                                          "Iniciar sesión",
+                                          style: TextStyle(
+                                            color: AppColors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+
+                              Center(
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      "¿Aún no tienes cuenta?",
                                       style: TextStyle(
-                                        color: Color(0xFF9D26F2),
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textGray,
+                                        fontSize: 14,
                                       ),
                                     ),
-                                  ),
+                                    const SizedBox(height: 12),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      height: 56,
+                                      child: OutlinedButton(
+                                        style: OutlinedButton.styleFrom(
+                                          side: const BorderSide(color: AppColors.primaryPurple, width: 2),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(16),
+                                          ),
+                                        ),
+                                        onPressed: () {
+                                          Navigator.pushNamed(context, "/register");
+                                        },
+                                        child: const Text(
+                                          "Regístrate",
+                                          style: TextStyle(
+                                            color: AppColors.primaryPurple,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
@@ -287,7 +356,7 @@ class _LoginPageState extends State<LoginPage> {
                       ],
                     ),
                   ),
-                ],
+                ),
               ),
             ),
           ],

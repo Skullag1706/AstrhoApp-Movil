@@ -42,36 +42,88 @@ class ApiService {
     }
   }
 
-  // Obtener todas las citas
+  // Obtener todas las citas con paginación
   Future<List<Agenda>> getAgendas() async {
     try {
-      final response = await http
-          .get(Uri.parse('$baseUrl/Agenda'), headers: _headers)
-          .timeout(timeoutDuration);
+      final List<Agenda> todasLasCitas = [];
+      int paginaActual = 1;
+      bool hayMasPaginas = true;
 
-      if (response.statusCode == 200) {
-        return _parseAgendaList(response.body);
+      while (hayMasPaginas) {
+        print('Llamando a API: $baseUrl/Agenda?pagina=$paginaActual');
+        
+        final response = await http
+            .get(Uri.parse('$baseUrl/Agenda?pagina=$paginaActual'), headers: _headers)
+            .timeout(timeoutDuration);
+
+        print('Status code: ${response.statusCode}');
+
+        if (response.statusCode == 200) {
+          final agendasEnPagina = _parseAgendaList(response.body);
+          todasLasCitas.addAll(agendasEnPagina);
+
+          final data = _parseJson(response.body);
+          if (data is Map<String, dynamic>) {
+            final totalPaginas = data['totalPaginas'] ?? data['total_paginas'] ?? 1;
+            hayMasPaginas = paginaActual < totalPaginas;
+            print('Página $paginaActual de $totalPaginas - Citas: ${agendasEnPagina.length}');
+          } else {
+            hayMasPaginas = false;
+          }
+        } else {
+          print('Error en getAgendas: ${response.statusCode} - ${response.body}');
+          hayMasPaginas = false;
+        }
+
+        paginaActual++;
       }
-      return [];
+
+      print('Total de citas obtenidas: ${todasLasCitas.length}');
+      return todasLasCitas;
     } catch (e) {
       print('Excepción al obtener todas las citas: $e');
       return [];
     }
   }
 
-  // Obtener citas del cliente logueado
+  // Obtener citas del cliente logueado con paginación
   Future<List<Agenda>> getMisCitas() async {
     try {
-      final response = await http
-          .get(Uri.parse('$baseUrl/Agenda/mis-citas'), headers: _headers)
-          .timeout(timeoutDuration);
+      final List<Agenda> todasLasCitas = [];
+      int paginaActual = 1;
+      bool hayMasPaginas = true;
 
-      if (response.statusCode == 200) {
-        return _parseAgendaList(response.body);
-      } else {
-        print('Error en mis-citas: ${response.statusCode} - ${response.body}');
-        return [];
+      while (hayMasPaginas) {
+        print('Llamando a API: $baseUrl/Agenda/mis-citas?pagina=$paginaActual');
+        
+        final response = await http
+            .get(Uri.parse('$baseUrl/Agenda/mis-citas?pagina=$paginaActual'), headers: _headers)
+            .timeout(timeoutDuration);
+
+        print('Status code: ${response.statusCode}');
+
+        if (response.statusCode == 200) {
+          final agendasEnPagina = _parseAgendaList(response.body);
+          todasLasCitas.addAll(agendasEnPagina);
+
+          final data = _parseJson(response.body);
+          if (data is Map<String, dynamic>) {
+            final totalPaginas = data['totalPaginas'] ?? data['total_paginas'] ?? 1;
+            hayMasPaginas = paginaActual < totalPaginas;
+            print('Página $paginaActual de $totalPaginas - Citas: ${agendasEnPagina.length}');
+          } else {
+            hayMasPaginas = false;
+          }
+        } else {
+          print('Error en mis-citas: ${response.statusCode} - ${response.body}');
+          hayMasPaginas = false;
+        }
+
+        paginaActual++;
       }
+
+      print('Total de mis citas obtenidas: ${todasLasCitas.length}');
+      return todasLasCitas;
     } catch (e) {
       print('Excepción en mis-citas: $e');
       return [];
@@ -357,6 +409,63 @@ class ApiService {
     }
   }
 
+  // Confirmar una cita
+  Future<Agenda> confirmarCita(int id) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/Agenda/$id/confirmar'),
+            headers: _headers,
+          )
+          .timeout(timeoutDuration);
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        return await getAgendaById(id);
+      }
+      throw Exception('Error al confirmar la cita: ${response.statusCode}');
+    } catch (e) {
+      throw Exception('Error de conexión: $e');
+    }
+  }
+
+  // Completar una cita
+  Future<Agenda> completarCita(int id) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/Agenda/$id/completar'),
+            headers: _headers,
+          )
+          .timeout(timeoutDuration);
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        return await getAgendaById(id);
+      }
+      throw Exception('Error al completar la cita: ${response.statusCode}');
+    } catch (e) {
+      throw Exception('Error de conexión: $e');
+    }
+  }
+
+  // Cancelar una cita
+  Future<Agenda> cancelarCita(int id) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/Agenda/$id/cancelar'),
+            headers: _headers,
+          )
+          .timeout(timeoutDuration);
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        return await getAgendaById(id);
+      }
+      throw Exception('Error al cancelar la cita: ${response.statusCode}');
+    } catch (e) {
+      throw Exception('Error de conexión: $e');
+    }
+  }
+
   // Eliminar una cita
   Future<void> deleteAgenda(int id) async {
     try {
@@ -520,69 +629,115 @@ class ApiService {
     }
   }
 
-  // Obtener servicios
-  Future<List<Servicio>> getServicios() async {
+  // Obtener servicios con paginación y búsqueda
+  Future<Map<String, dynamic>> getServicios({
+    int pagina = 1,
+    String? busqueda,
+  }) async {
     try {
-      // Intentar primero con la ruta plural
+      // Construir URL con parámetros
+      String url = '$baseUrl/Servicios?pagina=$pagina';
+      if (busqueda != null && busqueda.isNotEmpty) {
+        url += '&buscar=${Uri.encodeComponent(busqueda)}';
+      }
+
+      print('Intentando endpoint con paginación: $url');
       final response = await http
-          .get(Uri.parse('$baseUrl/Servicios'), headers: _headers)
+          .get(Uri.parse(url), headers: _headers)
           .timeout(timeoutDuration);
 
-      print('Intentando endpoint: $baseUrl/Servicios');
       print('Respuesta servicios status: ${response.statusCode}');
       print('Respuesta servicios body: ${response.body}');
 
       if (response.statusCode == 200) {
-        return _parseServicioList(response.body);
+        final result = _parseServiciosPaginados(response.body);
+        return result;
       } else if (response.statusCode == 404) {
         // Intentar con ruta singular
+        String urlSingular = '$baseUrl/Servicio?pagina=$pagina';
+        if (busqueda != null && busqueda.isNotEmpty) {
+          urlSingular += '&buscar=${Uri.encodeComponent(busqueda)}';
+        }
+        
         final responseSingular = await http
-            .get(Uri.parse('$baseUrl/Servicio'), headers: _headers)
+            .get(Uri.parse(urlSingular), headers: _headers)
             .timeout(timeoutDuration);
-        print('Intentando endpoint singular: $baseUrl/Servicio');
+        print('Intentando endpoint singular: $urlSingular');
         print('Respuesta singular status: ${responseSingular.statusCode}');
         if (responseSingular.statusCode == 200) {
-          return _parseServicioList(responseSingular.body);
+          return _parseServiciosPaginados(responseSingular.body);
         }
       }
-      return [];
+      
+      // Si no hay respuesta exitosa, devolver estructura vacía
+      return {
+        'servicios': <Servicio>[],
+        'totalPaginas': 1,
+        'paginaActual': pagina,
+        'totalServicios': 0,
+      };
     } catch (e) {
       print('Excepción al obtener servicios: $e');
-      return [];
+      return {
+        'servicios': <Servicio>[],
+        'totalPaginas': 1,
+        'paginaActual': pagina,
+        'totalServicios': 0,
+      };
     }
   }
 
-  List<Servicio> _parseServicioList(String body) {
+  Map<String, dynamic> _parseServiciosPaginados(String body) {
     if (body.trim().isEmpty) {
       print('Cuerpo de servicios vacío');
-      return [];
+      return {
+        'servicios': <Servicio>[],
+        'totalPaginas': 1,
+        'paginaActual': 1,
+        'totalServicios': 0,
+      };
     }
+    
     try {
       final dynamic data = _parseJson(body);
-      List<dynamic> list = [];
+      List<dynamic> serviciosList = [];
+      int totalPaginas = 1;
+      int paginaActual = 1;
+      int totalServicios = 0;
+
       if (data is List) {
-        list = data;
+        serviciosList = data;
+        totalServicios = serviciosList.length;
       } else if (data is Map<String, dynamic>) {
+        // Buscar información de paginación
+        totalPaginas = data['totalPaginas'] ?? data['total_paginas'] ?? 1;
+        paginaActual = data['paginaActual'] ?? data['pagina_actual'] ?? 1;
+        totalServicios = data['totalServicios'] ?? data['total_servicios'] ?? 0;
+
+        // Buscar lista de servicios
         if (data.containsKey('data') && data['data'] is List) {
-          list = data['data'];
+          serviciosList = data['data'];
+        } else if (data.containsKey('servicios') && data['servicios'] is List) {
+          serviciosList = data['servicios'];
         } else if (data.containsKey('items') && data['items'] is List) {
-          list = data['items'];
+          serviciosList = data['items'];
         } else {
           for (var value in data.values) {
             if (value is List) {
-              list = value;
+              serviciosList = value;
               break;
             }
           }
         }
       }
-      print('Lista de servicios para parsear: ${list.length} elementos');
-      final servicios = list
+
+      print('Lista de servicios para parsear: ${serviciosList.length} elementos');
+      final servicios = serviciosList
           .map((json) {
             try {
               print('Parseando servicio: $json');
               final servicio = Servicio.fromJson(json as Map<String, dynamic>);
-              print('Servicio parseado: ID=${servicio.servicioId}, Nombre=${servicio.nombre}, Precio=${servicio.precio}');
+              print('Servicio parseado: ID=${servicio.servicioId}, Nombre=${servicio.nombre}, Imagen=${servicio.imagen}');
               return servicio;
             } catch (e) {
               print('Error al parsear servicio individual: $e');
@@ -592,13 +747,33 @@ class ApiService {
           .where((s) => s != null)
           .cast<Servicio>()
           .toList();
+
       print('Servicios parseados exitosamente: ${servicios.length}');
-      for (var s in servicios) {
-        print('  - ${s.servicioId}: ${s.nombre} - ${s.precio}');
-      }
-      return servicios;
+      
+      return {
+        'servicios': servicios,
+        'totalPaginas': totalPaginas,
+        'paginaActual': paginaActual,
+        'totalServicios': totalServicios,
+      };
     } catch (e) {
-      print('Error general parseando lista de servicios: $e');
+      print('Error general parseando servicios paginados: $e');
+      return {
+        'servicios': <Servicio>[],
+        'totalPaginas': 1,
+        'paginaActual': 1,
+        'totalServicios': 0,
+      };
+    }
+  }
+
+  // Método de compatibilidad - obtener todos los servicios sin paginación
+  Future<List<Servicio>> getServiciosLegacy() async {
+    try {
+      final result = await getServicios(pagina: 1);
+      return result['servicios'] as List<Servicio>;
+    } catch (e) {
+      print('Error en getServiciosLegacy: $e');
       return [];
     }
   }
@@ -608,10 +783,13 @@ class ApiService {
     final List<dynamic> allItems = [];
     int page = 1;
     bool hasMore = true;
-    const int pageSize = 100;
+    
+    // Asumimos un tamaño de página fijo de 5 según el backend
+    const int backendPageSize = 5;
 
     while (hasMore) {
-      final url = Uri.parse('$baseUrl$endpoint?page=$page&pageSize=$pageSize');
+      // Usar parámetro 'pagina' en lugar de 'page' y 'pageSize'
+      final url = Uri.parse('$baseUrl$endpoint?pagina=$page');
       print('Fetching: $url');
 
       final response = await http
@@ -655,8 +833,8 @@ class ApiService {
           allItems.addAll(items);
           page++;
           
-          if (items.length < pageSize) {
-            print('Page has fewer items ($items.length) than pageSize ($pageSize), stopping');
+          if (items.length < backendPageSize) {
+            print('Page has fewer items ($items.length) than pageSize ($backendPageSize), stopping');
             hasMore = false;
           } else {
             print('Continuing to next page...');
@@ -671,6 +849,8 @@ class ApiService {
     print('Total items fetched from $endpoint: ${allItems.length}');
     return allItems;
   }
+
+
 
   // Obtener clientes (todos los registros con paginación)
   Future<List<Cliente>> getClientes() async {
@@ -807,6 +987,203 @@ class ApiService {
           .toList();
     } catch (e) {
       print('Error parseando lista de empleados: $e');
+      return [];
+    }
+  }
+
+  // Obtener horarios generales
+  Future<List<Horario>> getHorarios() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/Horario'), headers: _headers)
+          .timeout(timeoutDuration);
+
+      if (response.statusCode == 200) {
+        return _parseHorarioList(response.body);
+      }
+      return [];
+    } catch (e) {
+      print('Excepción al obtener horarios: $e');
+      return [];
+    }
+  }
+
+  List<Horario> _parseHorarioList(String body) {
+    if (body.trim().isEmpty) return [];
+    try {
+      final dynamic data = _parseJson(body);
+      List<dynamic> list = [];
+      if (data is List) {
+        list = data;
+      } else if (data is Map<String, dynamic>) {
+        if (data.containsKey('data') && data['data'] is List) {
+          list = data['data'];
+        } else if (data.containsKey('items') && data['items'] is List) {
+          list = data['items'];
+        } else {
+          for (var value in data.values) {
+            if (value is List) {
+              list = value;
+              break;
+            }
+          }
+        }
+      }
+      return list
+          .map((json) {
+            try {
+              return Horario.fromJson(json as Map<String, dynamic>);
+            } catch (e) {
+              return null;
+            }
+          })
+          .where((h) => h != null)
+          .cast<Horario>()
+          .toList();
+    } catch (e) {
+      print('Error parseando lista de horarios: $e');
+      return [];
+    }
+  }
+
+  // Obtener horarios de un empleado específico
+  Future<List<HorarioEmpleado>> getHorariosEmpleado(String documentoEmpleado) async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/HorarioEmpleado/empleado/$documentoEmpleado'), headers: _headers)
+          .timeout(timeoutDuration);
+
+      if (response.statusCode == 200) {
+        return _parseHorarioEmpleadoList(response.body);
+      }
+      return [];
+    } catch (e) {
+      print('Excepción al obtener horarios de empleado: $e');
+      return [];
+    }
+  }
+
+  List<HorarioEmpleado> _parseHorarioEmpleadoList(String body) {
+    if (body.trim().isEmpty) {
+      print('Cuerpo de horarios de empleado vacío');
+      return [];
+    }
+    
+    print('Parseando horarios de empleado. Body: ${body.substring(0, body.length > 500 ? 500 : body.length)}');
+    
+    try {
+      final dynamic data = _parseJson(body);
+      List<dynamic> list = [];
+      if (data is List) {
+        list = data;
+      } else if (data is Map<String, dynamic>) {
+        print('Data es Map, keys: ${data.keys}');
+        if (data.containsKey('data') && data['data'] is List) {
+          list = data['data'];
+        } else if (data.containsKey('items') && data['items'] is List) {
+          list = data['items'];
+        } else {
+          for (var value in data.values) {
+            if (value is List) {
+              list = value;
+              break;
+            }
+          }
+        }
+      }
+      
+      print('Lista de horarios encontrada: ${list.length} items');
+      
+      final result = list
+          .map((json) {
+            try {
+              return HorarioEmpleado.fromJson(json as Map<String, dynamic>);
+            } catch (e) {
+              print('Error parseando horario empleado individual: $e');
+              return null;
+            }
+          })
+          .where((h) => h != null)
+          .cast<HorarioEmpleado>()
+          .toList();
+      
+      print('Horarios de empleado parseados exitosamente: ${result.length}');
+      return result;
+    } catch (e) {
+      print('Error parseando lista de horarios de empleado: $e');
+      return [];
+    }
+  }
+
+  // Obtener citas de un empleado en una fecha específica
+  Future<List<Agenda>> getAgendasEmpleadoFecha(String documentoEmpleado, DateTime fecha) async {
+    try {
+      final fechaStr = fecha.toIso8601String().split('T')[0];
+      final url = '$baseUrl/Agenda/empleado/$documentoEmpleado/fecha/$fechaStr';
+      
+      print('🔍 getAgendasEmpleadoFecha:');
+      print('  - URL: $url');
+      print('  - Documento empleado: $documentoEmpleado');
+      print('  - Fecha: $fechaStr');
+      
+      final response = await http
+          .get(Uri.parse(url), headers: _headers)
+          .timeout(timeoutDuration);
+
+      print('  - Status code: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        print('  - Response body (primeros 500 chars): ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}');
+        final citas = _parseAgendaList(response.body);
+        print('  - Citas parseadas: ${citas.length}');
+        return citas;
+      }
+      
+      print('  - No hubo éxito en la solicitud, devolviendo lista vacía');
+      return [];
+    } catch (e) {
+      print('❌ Excepción al obtener agendas de empleado por fecha: $e');
+      return [];
+    }
+  }
+
+  // Obtener horas disponibles de un empleado en una fecha específica
+  Future<List<String>> getHorasDisponibles(String documentoEmpleado, DateTime fecha) async {
+    try {
+      final fechaStr = fecha.toIso8601String().split('T')[0];
+      final url = '$baseUrl/Agenda/horas-disponibles?documentoEmpleado=$documentoEmpleado&fecha=$fechaStr';
+      
+      print('🔍 getHorasDisponibles:');
+      print('  - URL: $url');
+      print('  - Documento empleado: $documentoEmpleado');
+      print('  - Fecha: $fechaStr');
+      
+      final response = await http
+          .get(Uri.parse(url), headers: _headers)
+          .timeout(timeoutDuration);
+
+      print('  - Status code: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        print('  - Response body: ${response.body}');
+        
+        try {
+          final data = _parseJson(response.body);
+          if (data is Map && data.containsKey('horasDisponibles') && data['horasDisponibles'] is List) {
+            final List<String> horas = (data['horasDisponibles'] as List)
+                .map((h) => h.toString())
+                .toList();
+            print('  - Horas disponibles: $horas');
+            return horas;
+          }
+        } catch (e) {
+          print('  - Error parseando horas disponibles: $e');
+        }
+      }
+      
+      return [];
+    } catch (e) {
+      print('❌ Excepción al obtener horas disponibles: $e');
       return [];
     }
   }

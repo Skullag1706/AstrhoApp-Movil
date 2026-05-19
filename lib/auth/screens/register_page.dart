@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:astrhoapp/core/utils/colors.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -130,7 +131,6 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> registerUser() async {
-    // Validate all fields
     setState(() {
       emailError = validateEmail(emailController.text);
       confirmEmailError = validateConfirmEmail(confirmEmailController.text);
@@ -158,7 +158,6 @@ class _RegisterPageState extends State<RegisterPage> {
 
     setState(() => isLoading = true);
 
-    // Check if email already exists
     final checkUrl = Uri.parse("http://www.astrhoapp.somee.com/api/Usuarios");
     try {
       final checkResponse = await http.get(checkUrl);
@@ -187,8 +186,8 @@ class _RegisterPageState extends State<RegisterPage> {
     final url = Uri.parse("http://www.astrhoapp.somee.com/api/Usuarios");
 
     final body = {
-      "rolId": 2, // 2 = Cliente
-      "nombreUsuario": emailController.text.split('@')[0], // Use email prefix as username
+      "rolId": 2,
+      "nombreUsuario": emailController.text.split('@')[0],
       "email": emailController.text.trim(),
       "contrasena": passController.text.trim(),
       "confirmarContrasena": confirmPassController.text.trim(),
@@ -240,7 +239,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
           if (clientRes.statusCode == 200 || clientRes.statusCode == 201) {
             showSuccess("Usuario creado exitosamente");
-            if (mounted) Navigator.pop(context); // Go back to login
+            if (mounted) Navigator.pop(context);
           } else {
             showError("Usuario creado, pero hubo un error al guardar datos de cliente");
           }
@@ -270,415 +269,52 @@ class _RegisterPageState extends State<RegisterPage> {
     ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.green));
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFB530F4), Color(0xFFFD3C8D)],
+  Widget _topBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Row(
+              children: [
+                const Icon(Icons.arrow_back, color: AppColors.primaryPurple),
+                const SizedBox(width: 6),
+                const Text(
+                  "Volver",
+                  style: TextStyle(color: AppColors.primaryPurple, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
           ),
-        ),
-        child: Stack(
-          children: [
-            // Main content centered
-            Center(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      GestureDetector(
-                        onTap: () => Navigator.pop(context),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.arrow_back, color: Colors.white),
-                            SizedBox(width: 6),
-                            Text(
-                              "Volver",
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 15),
-
-                      // ICONO EMAIL
-                      Container(
-                        padding: const EdgeInsets.all(15),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.mail,
-                          color: Colors.white,
-                          size: 30,
-                        ),
-                      ),
-
-                      const SizedBox(height: 12),
-                      const Text(
-                        "Crear cuenta",
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 15),
-
-                      // CARD BLANCO
-                      Container(
-                        padding: const EdgeInsets.all(15),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                const Text("Correo"),
-                                if (emailError != null ||
-                                    emailExistsError != null) ...[
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    emailError ?? emailExistsError!,
-                                    style: const TextStyle(
-                                      color: Colors.red,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 5),
-                            inputBox(
-                              controller: emailController,
-                              icon: Icons.mail,
-                              hint: "Ingresa tu correo",
-                              onChanged: (value) {
-                                setState(
-                                  () => emailError = validateEmail(value),
-                                );
-                                checkEmailExists(value);
-                              },
-                              isError:
-                                  emailError != null ||
-                                  emailExistsError != null,
-                              isValid:
-                                  emailError == null &&
-                                  emailExistsError == null &&
-                                  emailController.text.isNotEmpty,
-                            ),
-
-                            const SizedBox(height: 12),
-                            const Text("Confirmar correo"),
-                            const SizedBox(height: 5),
-                            inputBox(
-                              controller: confirmEmailController,
-                              icon: Icons.mail,
-                              hint: "Confirma tu correo",
-                              onChanged: (value) => setState(
-                                () => confirmEmailError = validateConfirmEmail(
-                                  value,
-                                ),
-                              ),
-                              isError: confirmEmailError != null,
-                              isValid:
-                                  confirmEmailError == null &&
-                                  confirmEmailController.text.isNotEmpty,
-                            ),
-
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                const Text("Contraseña"),
-                                if (passError != null) ...[
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    passError!,
-                                    style: const TextStyle(
-                                      color: Colors.red,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 5),
-                            inputBox(
-                              controller: passController,
-                              icon: Icons.lock,
-                              hint: "Ingresa tu contraseña",
-                              isPassword: true,
-                              showPassword: showPass,
-                              onToggle: () =>
-                                  setState(() => showPass = !showPass),
-                              onChanged: (value) => setState(
-                                () => passError = validatePass(value),
-                              ),
-                            ),
-
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                const Text("Confirmar contraseña"),
-                                if (confirmPassError != null) ...[
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    confirmPassError!,
-                                    style: const TextStyle(
-                                      color: Colors.red,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 5),
-                            inputBox(
-                              controller: confirmPassController,
-                              icon: Icons.lock,
-                              hint: "Confirma tu contraseña",
-                              isPassword: true,
-                              showPassword: showConfirmPass,
-                              onToggle: () => setState(
-                                () => showConfirmPass = !showConfirmPass,
-                              ),
-                              onChanged: (value) => setState(
-                                () => confirmPassError = validateConfirmPass(
-                                  value,
-                                ),
-                              ),
-                            ),
-
-                            const SizedBox(height: 20),
-                            const Divider(color: Colors.grey),
-                            const SizedBox(height: 10),
-                            const Text(
-                              "Datos Personales",
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF7926F7),
-                              ),
-                            ),
-                            const SizedBox(height: 15),
-
-                            Row(
-                              children: [
-                                const Text("Tipo de Documento"),
-                                if (tipoDocumentoError != null) ...[
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    tipoDocumentoError!,
-                                    style: const TextStyle(
-                                      color: Colors.red,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 5),
-                            Container(
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: tipoDocumentoError != null ? Colors.red : Colors.grey.shade300,
-                                  width: 2,
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                children: [
-                                  const SizedBox(width: 10),
-                                  const Icon(Icons.assignment_ind, color: Colors.grey),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: DropdownButtonFormField<String>(
-                                      initialValue: tipoDocumento,
-                                      hint: const Text("Selecciona tipo"),
-                                      items: tipoDocumentoOptions.map((String value) {
-                                        return DropdownMenuItem<String>(
-                                          value: value,
-                                          child: Text(value),
-                                        );
-                                      }).toList(),
-                                      onChanged: (newValue) {
-                                        setState(() {
-                                          tipoDocumento = newValue;
-                                          tipoDocumentoError = null;
-                                        });
-                                      },
-                                      decoration: const InputDecoration(border: InputBorder.none),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                const Text("Documento Cliente"),
-                                if (documentoError != null) ...[
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    documentoError!,
-                                    style: const TextStyle(
-                                      color: Colors.red,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 5),
-                            inputBox(
-                              controller: documentoCtrl,
-                              icon: Icons.credit_card,
-                              hint: "Ingresa tu documento",
-                              onChanged: (value) => setState(() => documentoError = validateDocumento(value)),
-                              isError: documentoError != null,
-                            ),
-
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                const Text("Nombre"),
-                                if (nombreClienteError != null) ...[
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    nombreClienteError!,
-                                    style: const TextStyle(
-                                      color: Colors.red,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 5),
-                            inputBox(
-                              controller: nombreCtrl,
-                              icon: Icons.person_outline,
-                              hint: "Ingresa tu nombre completo",
-                              onChanged: (value) => setState(() => nombreClienteError = validateNombreCliente(value)),
-                              isError: nombreClienteError != null,
-                            ),
-
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                const Text("Teléfono"),
-                                if (telefonoError != null) ...[
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    telefonoError!,
-                                    style: const TextStyle(
-                                      color: Colors.red,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 5),
-                            inputBox(
-                              controller: telefonoCtrl,
-                              icon: Icons.phone,
-                              hint: "Ingresa tu teléfono",
-                              onChanged: (value) => setState(() => telefonoError = validateTelefono(value)),
-                              isError: telefonoError != null,
-                            ),
-
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                const Text("Dirección"),
-                                if (direccionError != null) ...[
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    direccionError!,
-                                    style: const TextStyle(
-                                      color: Colors.red,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 5),
-                            inputBox(
-                              controller: direccionCtrl,
-                              icon: Icons.location_on,
-                              hint: "Ingresa tu dirección",
-                              onChanged: (value) => setState(() => direccionError = validateDireccion(value)),
-                              isError: direccionError != null,
-                              isValid:
-                                  direccionError == null &&
-                                  direccionCtrl.text.isNotEmpty,
-                            ),
-
-                            const SizedBox(height: 25),
-
-                            GestureDetector(
-                              onTap: isLoading ? null : registerUser,
-                              child: Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 15,
-                                ),
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      Color(0xFF7926F7),
-                                      Color(0xFFF63D77),
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Center(
-                                  child: isLoading
-                                      ? const SizedBox(
-                                          height: 20,
-                                          width: 20,
-                                          child: CircularProgressIndicator(
-                                            color: Colors.white,
-                                            strokeWidth: 2,
-                                          ),
-                                        )
-                                      : const Text(
-                                          "Registrarse",
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.lightPurpleBackground,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.auto_awesome,
+                  color: AppColors.primaryPurple,
+                  size: 20,
                 ),
               ),
-            ),
-          ],
-        ),
+              const SizedBox(width: 8),
+              const Text(
+                "AstrhoApp",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primaryPurple,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 48),
+        ],
       ),
     );
   }
@@ -690,26 +326,23 @@ class _RegisterPageState extends State<RegisterPage> {
     bool isPassword = false,
     bool showPassword = false,
     VoidCallback? onToggle,
-    String? Function(String?)? validator,
     Function(String)? onChanged,
     bool isError = false,
-    bool isValid = false,
   }) {
-    Color borderColor = Colors.grey.shade300;
+    Color borderColor = AppColors.borderLight;
     if (isError) {
       borderColor = Colors.red;
-    } else if (isValid) {
-      borderColor = Colors.green;
     }
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: borderColor, width: 2),
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.scaffoldBackground,
+        border: Border.all(color: borderColor, width: 1),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         children: [
-          const SizedBox(width: 10),
-          Icon(icon, color: Colors.grey),
+          const SizedBox(width: 12),
+          Icon(icon, color: AppColors.textGray),
           const SizedBox(width: 10),
           Expanded(
             child: TextFormField(
@@ -717,9 +350,10 @@ class _RegisterPageState extends State<RegisterPage> {
               obscureText: isPassword ? !showPassword : false,
               decoration: InputDecoration(
                 hintText: hint,
+                hintStyle: const TextStyle(color: AppColors.textGray),
                 border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              validator: validator,
               onChanged: onChanged,
             ),
           ),
@@ -727,12 +361,281 @@ class _RegisterPageState extends State<RegisterPage> {
             IconButton(
               icon: Icon(
                 showPassword ? Icons.visibility_off : Icons.visibility,
-                color: Colors.grey,
+                color: AppColors.textGray,
               ),
               onPressed: onToggle,
             ),
         ],
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.scaffoldBackground,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _topBar(),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: AppColors.lightPurpleBackground,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.person_add_alt_1,
+                        color: AppColors.primaryPurple,
+                        size: 40,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      "Crear cuenta",
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textDark,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "Completa tus datos para registrarte",
+                      style: TextStyle(
+                        color: AppColors.textGray,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.borderLight),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildLabel("Correo", emailError ?? emailExistsError),
+                          const SizedBox(height: 8),
+                          inputBox(
+                            controller: emailController,
+                            icon: Icons.alternate_email,
+                            hint: "Ingresa tu correo",
+                            onChanged: (value) {
+                              setState(() => emailError = validateEmail(value));
+                              checkEmailExists(value);
+                            },
+                            isError: emailError != null || emailExistsError != null,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildLabel("Confirmar correo", confirmEmailError),
+                          const SizedBox(height: 8),
+                          inputBox(
+                            controller: confirmEmailController,
+                            icon: Icons.alternate_email,
+                            hint: "Confirma tu correo",
+                            onChanged: (value) => setState(() => confirmEmailError = validateConfirmEmail(value)),
+                            isError: confirmEmailError != null,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildLabel("Contraseña", passError),
+                          const SizedBox(height: 8),
+                          inputBox(
+                            controller: passController,
+                            icon: Icons.lock_outline,
+                            hint: "Ingresa tu contraseña",
+                            isPassword: true,
+                            showPassword: showPass,
+                            onToggle: () => setState(() => showPass = !showPass),
+                            onChanged: (value) => setState(() => passError = validatePass(value)),
+                            isError: passError != null,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildLabel("Confirmar contraseña", confirmPassError),
+                          const SizedBox(height: 8),
+                          inputBox(
+                            controller: confirmPassController,
+                            icon: Icons.lock_outline,
+                            hint: "Confirma tu contraseña",
+                            isPassword: true,
+                            showPassword: showConfirmPass,
+                            onToggle: () => setState(() => showConfirmPass = !showConfirmPass),
+                            onChanged: (value) => setState(() => confirmPassError = validateConfirmPass(value)),
+                            isError: confirmPassError != null,
+                          ),
+                          const SizedBox(height: 24),
+                          const Divider(color: AppColors.borderLight),
+                          const SizedBox(height: 20),
+                          const Text(
+                            "Datos Personales",
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primaryPurple,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          _buildLabel("Tipo de Documento", tipoDocumentoError),
+                          const SizedBox(height: 8),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.scaffoldBackground,
+                              border: Border.all(
+                                color: tipoDocumentoError != null ? Colors.red : AppColors.borderLight,
+                                width: 1,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Row(
+                              children: [
+                                const SizedBox(width: 12),
+                                const Icon(Icons.assignment_ind, color: AppColors.textGray),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: DropdownButtonFormField<String>(
+                                    value: tipoDocumento,
+                                    hint: const Text("Selecciona tipo", style: TextStyle(color: AppColors.textGray)),
+                                    items: tipoDocumentoOptions.map((String value) {
+                                      return DropdownMenuItem<String>(
+                                        value: value,
+                                        child: Text(value, style: const TextStyle(color: AppColors.textDark)),
+                                      );
+                                    }).toList(),
+                                    onChanged: (newValue) {
+                                      setState(() {
+                                        tipoDocumento = newValue;
+                                        tipoDocumentoError = null;
+                                      });
+                                    },
+                                    decoration: const InputDecoration(
+                                      border: InputBorder.none,
+                                      contentPadding: EdgeInsets.symmetric(vertical: 16),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          _buildLabel("Documento Cliente", documentoError),
+                          const SizedBox(height: 8),
+                          inputBox(
+                            controller: documentoCtrl,
+                            icon: Icons.credit_card,
+                            hint: "Ingresa tu documento",
+                            onChanged: (value) => setState(() => documentoError = validateDocumento(value)),
+                            isError: documentoError != null,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildLabel("Nombre", nombreClienteError),
+                          const SizedBox(height: 8),
+                          inputBox(
+                            controller: nombreCtrl,
+                            icon: Icons.person_outline,
+                            hint: "Ingresa tu nombre completo",
+                            onChanged: (value) => setState(() => nombreClienteError = validateNombreCliente(value)),
+                            isError: nombreClienteError != null,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildLabel("Teléfono", telefonoError),
+                          const SizedBox(height: 8),
+                          inputBox(
+                            controller: telefonoCtrl,
+                            icon: Icons.phone,
+                            hint: "Ingresa tu teléfono",
+                            onChanged: (value) => setState(() => telefonoError = validateTelefono(value)),
+                            isError: telefonoError != null,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildLabel("Dirección", direccionError),
+                          const SizedBox(height: 8),
+                          inputBox(
+                            controller: direccionCtrl,
+                            icon: Icons.location_on,
+                            hint: "Ingresa tu dirección",
+                            onChanged: (value) => setState(() => direccionError = validateDireccion(value)),
+                            isError: direccionError != null,
+                          ),
+                          const SizedBox(height: 28),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 56,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primaryPurple,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                elevation: 0,
+                              ),
+                              onPressed: isLoading ? null : registerUser,
+                              child: isLoading
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        color: AppColors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Text(
+                                      "Registrarse",
+                                      style: TextStyle(
+                                        color: AppColors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLabel(String text, String? error) {
+    return Row(
+      children: [
+        Text(
+          text,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textDark,
+          ),
+        ),
+        if (error != null) ...[
+          const SizedBox(width: 10),
+          Text(
+            error,
+            style: const TextStyle(
+              color: Colors.red,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

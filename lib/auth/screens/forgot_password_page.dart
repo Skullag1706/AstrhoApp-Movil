@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:astrhoapp/core/services/auth_service.dart';
+import 'package:astrhoapp/core/utils/colors.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -41,164 +42,226 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       setState(() => loading = false);
 
       if (token != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Código enviado a tu correo"),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.pushNamed(
-          context,
-          '/confirm-code',
-          arguments: {"token": token, "email": emailCtrl.text.trim()},
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Código enviado a tu correo"),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.pushNamed(
+            context,
+            '/confirm-code',
+            arguments: {"token": token, "email": emailCtrl.text.trim()},
+          );
+        }
       } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Error al recuperar contraseña"),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() => loading = false);
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Error al recuperar contraseña"),
+            content: Text("Error de conexión: $e"),
             backgroundColor: Colors.red,
           ),
         );
       }
-    } catch (e) {
-      setState(() => loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Error de conexión: $e"),
-          backgroundColor: Colors.red,
-        ),
-      );
     }
+  }
+
+  Widget _topBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Row(
+              children: [
+                const Icon(Icons.arrow_back, color: AppColors.primaryPurple),
+                const SizedBox(width: 6),
+                const Text(
+                  "Volver",
+                  style: TextStyle(color: AppColors.primaryPurple, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.lightPurpleBackground,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.auto_awesome,
+                  color: AppColors.primaryPurple,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                "AstrhoApp",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primaryPurple,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 48),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0XFF9D26F2), Color(0XFFE9418C)],
-          ),
-        ),
-        child: Stack(
+      backgroundColor: AppColors.scaffoldBackground,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(25),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.lock_reset,
-                      color: Colors.white,
-                      size: 45,
-                    ),
-                  ),
-                  SizedBox(height: 20),
-                  Text(
-                    "Recuperar contraseña",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    "Ingresa tu correo para recibir el código",
-                    style: TextStyle(color: Colors.white70, fontSize: 15),
-                  ),
-                  SizedBox(height: 30),
-                  Container(
-                    width: 340,
-                    padding: EdgeInsets.all(25),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(25),
-                    ),
+            _topBar(),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Center(
+                  child: SingleChildScrollView(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text("Correo", style: TextStyle(fontSize: 15)),
-                        SizedBox(height: 5),
-                        TextField(
-                          controller: emailCtrl,
-                          decoration: InputDecoration(
-                            prefixIcon: Icon(Icons.alternate_email),
-                            hintText: "Ingresa tu correo",
-                            filled: true,
-                            fillColor: Colors.grey[100],
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
-                            ),
-                            errorText: emailError,
+                        Container(
+                          padding: const EdgeInsets.all(25),
+                          decoration: BoxDecoration(
+                            color: AppColors.lightPurpleBackground,
+                            shape: BoxShape.circle,
                           ),
-                          onChanged: (value) =>
-                              setState(() => emailError = validateEmail(value)),
+                          child: const Icon(
+                            Icons.lock_reset,
+                            color: AppColors.primaryPurple,
+                            size: 45,
+                          ),
                         ),
-                        SizedBox(height: 20),
-                        GestureDetector(
-                          onTap: loading ? null : requestRecovery,
-                          child: Container(
-                            width: double.infinity,
-                            padding: EdgeInsets.symmetric(vertical: 15),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [Color(0xFF9D26F2), Color(0xFFE9418C)],
+                        const SizedBox(height: 24),
+                        const Text(
+                          "Recuperar contraseña",
+                          style: TextStyle(
+                            color: AppColors.textDark,
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          "Ingresa tu correo para recibir el código",
+                          style: TextStyle(color: AppColors.textGray, fontSize: 15),
+                        ),
+                        const SizedBox(height: 32),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: AppColors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: AppColors.borderLight),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                "Correo",
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.textDark,
+                                ),
                               ),
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            child: Center(
-                              child: loading
-                                  ? CircularProgressIndicator(
-                                      color: Colors.white,
-                                    )
-                                  : Text(
-                                      "Enviar código",
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                              const SizedBox(height: 8),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: AppColors.scaffoldBackground,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: AppColors.borderLight),
+                                ),
+                                child: TextField(
+                                  controller: emailCtrl,
+                                  decoration: InputDecoration(
+                                    prefixIcon: const Icon(Icons.alternate_email, color: AppColors.textGray),
+                                    hintText: "Ingresa tu correo",
+                                    hintStyle: const TextStyle(color: AppColors.textGray),
+                                    border: InputBorder.none,
+                                    contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                                    errorText: emailError,
+                                  ),
+                                  onChanged: (value) =>
+                                      setState(() => emailError = validateEmail(value)),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 56,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primaryPurple,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
                                     ),
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 20),
-                        Center(
-                          child: GestureDetector(
-                            onTap: () => Navigator.pop(context),
-                            child: Text(
-                              "Volver al inicio de sesión",
-                              style: TextStyle(
-                                color: Color(0xFF9D26F2),
-                                fontWeight: FontWeight.w600,
+                                    elevation: 0,
+                                  ),
+                                  onPressed: loading ? null : requestRecovery,
+                                  child: loading
+                                      ? const SizedBox(
+                                          height: 20,
+                                          width: 20,
+                                          child: CircularProgressIndicator(
+                                            color: AppColors.white,
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Text(
+                                          "Enviar código",
+                                          style: TextStyle(
+                                            color: AppColors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                ),
                               ),
-                            ),
+                              const SizedBox(height: 24),
+                              Center(
+                                child: GestureDetector(
+                                  onTap: () => Navigator.pop(context),
+                                  child: const Text(
+                                    "Volver al inicio de sesión",
+                                    style: TextStyle(
+                                      color: AppColors.primaryPurple,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
-              ),
-            ),
-            Positioned(
-              bottom: 20,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Text(
-                  "© 2025 Todos los derechos reservados",
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
                 ),
               ),
             ),

@@ -176,7 +176,7 @@ class _AgendaFormScreenState extends State<AgendaFormScreen> {
     }
 
     try {
-      _serviciosDisponibles = await _apiService.getServicios();
+      _serviciosDisponibles = await _apiService.getServiciosLegacy();
       print(
         'Servicios cargados en formulario: ${_serviciosDisponibles.length}',
       );
@@ -339,14 +339,6 @@ class _AgendaFormScreenState extends State<AgendaFormScreen> {
   bool get _isEmployeeUser {
     return widget.user != null &&
         widget.user!["rol"]?.toString().toLowerCase() == "empleado";
-  }
-
-  bool get _isAdminUser {
-    return widget.user != null &&
-        (widget.user!["rol"]?.toString().toLowerCase() == "administrador" ||
-         widget.user!["rol"]?.toString().toLowerCase() == "super admin" ||
-         widget.user!["rol"]?.toString().toLowerCase() == "superadmin" ||
-         widget.user!["rol"]?.toString().toLowerCase() == "super administrador");
   }
 
   double get _totalCosto {
