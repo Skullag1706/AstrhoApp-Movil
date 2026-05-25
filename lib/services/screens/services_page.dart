@@ -656,7 +656,7 @@ class ServiceCard extends StatelessWidget {
           ],
         ),
         Text(
-          '\${_formatPrice(service.precio)}',
+          '\$${_formatPrice(service.precio)}',
           style: const TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w800,
@@ -773,7 +773,7 @@ class ServiceCard extends StatelessWidget {
                 children: [
                   const Icon(Icons.attach_money, size: 20, color: kPrimary),
                   const SizedBox(width: 8),
-                  Text('Precio: \${_formatPrice(service.precio)}', style: const TextStyle(fontSize: 14)),
+                  Text('Precio: \$${_formatPrice(service.precio)}', style: const TextStyle(fontSize: 14)),
                 ],
               ),
             ],

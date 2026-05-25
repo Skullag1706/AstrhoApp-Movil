@@ -66,6 +66,20 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
   List<String> horasDisponiblesApi = []; // Horas que vienen de la API
   bool loadingHorarios = false;
 
+  // Pagination variables
+  final int _itemsPerPage = 5;
+  int _currentClientePage = 1;
+  int _totalClientePages = 1;
+  int _currentServicePage = 1;
+  int _totalServicePages = 1;
+  int _currentEmpleadoPage = 1;
+  int _totalEmpleadoPages = 1;
+
+  // Displayed items for pagination
+  List<Cliente> _displayedClientes = [];
+  List<Servicio> _displayedServicios = [];
+  List<Empleado> _displayedEmpleados = [];
+
   // Lógica de roles
   bool get isCliente =>
       widget.user?["rol"]?.toString().toLowerCase() == "cliente";
@@ -94,7 +108,8 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
       final futures = <Future>[];
       futures.add(_apiService.getClientes().then((data) => clientes = data));
       futures.add(_apiService.getEmpleados().then((data) => empleados = data));
-      futures.add(_apiService.getServiciosLegacy().then((data) => serviciosDisponibles = data));
+      // Load ALL services from all pages (API has 5 records per page)
+      futures.add(_loadAllServicios());
       futures.add(_apiService.getMetodosPago().then((data) => metodosPago = data));
 
       await Future.wait(futures);
@@ -106,6 +121,11 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
         print('  - Servicio $i: ID=${s.servicioId}, Nombre=${s.nombre}, Duracion=${s.duracion}');
       }
       print('========================================');
+
+      // Initialize pagination
+      _updatePaginationForClientes();
+      _updatePaginationForServicios();
+      _updatePaginationForEmpleados();
 
       // Si hay una cita para editar, prellenar los datos
       if (widget.agendaToEdit != null) {
@@ -188,6 +208,251 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
         });
       }
     }
+  }
+
+  // Load all services from all pages (API pagination: 5 records per page)
+  Future<void> _loadAllServicios() async {
+    try {
+      final List<Servicio> allServicios = [];
+      int currentPage = 1;
+      bool hasMorePages = true;
+
+      while (hasMorePages) {
+        final result = await _apiService.getServicios(pagina: currentPage);
+        final pageServicios = result['servicios'] as List<Servicio>;
+        
+        if (pageServicios.isEmpty) {
+          hasMorePages = false;
+        } else {
+          allServicios.addAll(pageServicios);
+          final totalPages = result['totalPaginas'] as int;
+          
+          if (currentPage >= totalPages) {
+            hasMorePages = false;
+          } else {
+            currentPage++;
+          }
+        }
+      }
+
+      serviciosDisponibles = allServicios;
+      print('Total servicios cargados de todas las páginas: ${serviciosDisponibles.length}');
+    } catch (e) {
+      print('Error cargando todos los servicios: $e');
+      serviciosDisponibles = [];
+    }
+  }
+
+  // Pagination helper methods
+  void _updatePaginationForClientes() {
+    _totalClientePages = (clientes.length / _itemsPerPage).ceil();
+    if (_totalClientePages == 0) _totalClientePages = 1;
+    _currentClientePage = 1;
+    _updateDisplayedClientes();
+  }
+
+  void _updatePaginationForServicios() {
+    _totalServicePages = (serviciosDisponibles.length / _itemsPerPage).ceil();
+    if (_totalServicePages == 0) _totalServicePages = 1;
+    _currentServicePage = 1;
+    _updateDisplayedServicios();
+  }
+
+  void _updatePaginationForEmpleados() {
+    _totalEmpleadoPages = (empleados.length / _itemsPerPage).ceil();
+    if (_totalEmpleadoPages == 0) _totalEmpleadoPages = 1;
+    _currentEmpleadoPage = 1;
+    _updateDisplayedEmpleados();
+  }
+
+  void _updateDisplayedClientes() {
+    final start = (_currentClientePage - 1) * _itemsPerPage;
+    final end = (start + _itemsPerPage).clamp(0, clientes.length);
+    _displayedClientes = clientes.sublist(start, end);
+  }
+
+  void _updateDisplayedServicios() {
+    final start = (_currentServicePage - 1) * _itemsPerPage;
+    final end = (start + _itemsPerPage).clamp(0, serviciosDisponibles.length);
+    _displayedServicios = serviciosDisponibles.sublist(start, end);
+  }
+
+  void _updateDisplayedEmpleados() {
+    final start = (_currentEmpleadoPage - 1) * _itemsPerPage;
+    final end = (start + _itemsPerPage).clamp(0, empleados.length);
+    _displayedEmpleados = empleados.sublist(start, end);
+  }
+
+  void _changeClientePage(int newPage) {
+    if (newPage != _currentClientePage && newPage >= 1 && newPage <= _totalClientePages) {
+      setState(() {
+        _currentClientePage = newPage;
+        _updateDisplayedClientes();
+      });
+    }
+  }
+
+  void _changeServicePage(int newPage) {
+    if (newPage != _currentServicePage && newPage >= 1 && newPage <= _totalServicePages) {
+      setState(() {
+        _currentServicePage = newPage;
+        _updateDisplayedServicios();
+      });
+    }
+  }
+
+  void _changeEmpleadoPage(int newPage) {
+    if (newPage != _currentEmpleadoPage && newPage >= 1 && newPage <= _totalEmpleadoPages) {
+      setState(() {
+        _currentEmpleadoPage = newPage;
+        _updateDisplayedEmpleados();
+      });
+    }
+  }
+
+  Widget _buildPaginationControls({
+    required int currentPage,
+    required int totalPages,
+    required Function(int) onPageChange,
+  }) {
+    if (totalPages <= 1) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: Colors.grey[200]!, width: 1),
+        ),
+      ),
+      child: Column(
+        children: [
+          Text(
+            'Página $currentPage de $totalPages',
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _paginationBtn(
+                Icons.first_page,
+                currentPage > 1 ? () => onPageChange(1) : null,
+              ),
+              const SizedBox(width: 4),
+              _paginationBtn(
+                Icons.chevron_left,
+                currentPage > 1 ? () => onPageChange(currentPage - 1) : null,
+              ),
+              const SizedBox(width: 8),
+              ..._buildPageNumbers(currentPage, totalPages, onPageChange),
+              const SizedBox(width: 8),
+              _paginationBtn(
+                Icons.chevron_right,
+                currentPage < totalPages ? () => onPageChange(currentPage + 1) : null,
+              ),
+              const SizedBox(width: 4),
+              _paginationBtn(
+                Icons.last_page,
+                currentPage < totalPages ? () => onPageChange(totalPages) : null,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildPageNumbers(int currentPage, int totalPages, Function(int) onPageChange) {
+    List<Widget> pages = [];
+    
+    int startPage = 1;
+    int endPage = totalPages;
+    
+    if (totalPages > 5) {
+      startPage = (currentPage - 2).clamp(1, totalPages - 4);
+      endPage = (currentPage + 2).clamp(5, totalPages);
+    }
+    
+    if (startPage > 1) {
+      pages.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Text('...', style: TextStyle(color: Colors.grey[600], fontSize: 10)),
+        ),
+      );
+    }
+    
+    for (int i = startPage; i <= endPage; i++) {
+      pages.add(const SizedBox(width: 2));
+      pages.add(_pageNumber(i, currentPage == i, () => onPageChange(i)));
+      pages.add(const SizedBox(width: 2));
+    }
+    
+    if (endPage < totalPages) {
+      pages.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Text('...', style: TextStyle(color: Colors.grey[600], fontSize: 10)),
+        ),
+      );
+    }
+    
+    return pages;
+  }
+
+  Widget _paginationBtn(IconData icon, VoidCallback? onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          color: onTap != null ? Colors.grey[100] : Colors.grey[50],
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: onTap != null ? Colors.grey[300]! : Colors.grey[200]!,
+            width: 1,
+          ),
+        ),
+        alignment: Alignment.center,
+        child: Icon(
+          icon,
+          size: 14,
+          color: onTap != null ? Colors.grey[600] : Colors.grey[300],
+        ),
+      ),
+    );
+  }
+
+  Widget _pageNumber(int page, bool isActive, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFF7926F7) : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          border: isActive
+              ? Border.all(color: const Color(0xFF7926F7), width: 2)
+              : Border.all(color: Colors.grey[300]!, width: 1),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          '$page',
+          style: TextStyle(
+            color: isActive ? Colors.white : Colors.grey[600],
+            fontWeight: FontWeight.w600,
+            fontSize: 11,
+          ),
+        ),
+      ),
+    );
   }
 
   // Cargar horarios del empleado seleccionado y citas de la fecha
@@ -635,6 +900,9 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
+    } else {
+      // Si estamos en el primer paso, regresar a mis citas
+      Navigator.pop(context);
     }
   }
 
@@ -827,118 +1095,159 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
                 ),
                 const SizedBox(height: 20),
                 Expanded(
-                  child: ListView.builder(
-                    padding: EdgeInsets.zero,
-                    itemCount: serviciosDisponibles.length,
-                    itemBuilder: (context, index) {
-                      final servicio = serviciosDisponibles[index];
-                      final isSelected = serviciosSeleccionados.contains(servicio.servicioId);
-                      return GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            if (isSelected) {
-                              serviciosSeleccionados.remove(servicio.servicioId);
-                            } else {
-                              serviciosSeleccionados.add(servicio.servicioId);
-                            }
-                          });
-                        },
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: isSelected ? const Color(0xFFE54BCF) : Colors.grey.shade200,
-                              width: isSelected ? 2 : 1,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 24,
-                                height: 24,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        ListView.builder(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _displayedServicios.length,
+                          itemBuilder: (context, index) {
+                            final servicio = _displayedServicios[index];
+                            final isSelected = serviciosSeleccionados.contains(servicio.servicioId);
+                            return GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  if (isSelected) {
+                                    serviciosSeleccionados.remove(servicio.servicioId);
+                                  } else {
+                                    serviciosSeleccionados.add(servicio.servicioId);
+                                  }
+                                });
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(18),
                                   border: Border.all(
-                                    color: isSelected ? const Color(0xFFE54BCF) : Colors.grey.shade400,
-                                    width: 2,
+                                    color: isSelected ? const Color(0xFFE54BCF) : Colors.grey.shade200,
+                                    width: isSelected ? 2 : 1,
                                   ),
-                                  color: isSelected ? const Color(0xFFE54BCF) : Colors.white,
                                 ),
-                                child: isSelected
-                                    ? const Icon(Icons.check, color: Colors.white, size: 16)
-                                    : null,
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                child: Row(
                                   children: [
+                                    Container(
+                                      width: 24,
+                                      height: 24,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: isSelected ? const Color(0xFFE54BCF) : Colors.grey.shade400,
+                                          width: 2,
+                                        ),
+                                        color: isSelected ? const Color(0xFFE54BCF) : Colors.white,
+                                      ),
+                                      child: isSelected
+                                          ? const Icon(Icons.check, color: Colors.white, size: 16)
+                                          : null,
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            servicio.nombre,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              const Icon(Icons.timer, color: Colors.grey, size: 14),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                "${servicio.duracion} min",
+                                                style: TextStyle(
+                                                  color: Colors.grey[600],
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                     Text(
-                                      servicio.nombre,
+                                      _formatCurrency(servicio.precio),
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 16,
+                                        color: Color(0xFF7926F7),
                                       ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.timer, color: Colors.grey, size: 14),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          "${servicio.duracion} min",
-                                          style: TextStyle(
-                                            color: Colors.grey[600],
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ],
                                     ),
                                   ],
                                 ),
                               ),
-                              Text(
-                                _formatCurrency(servicio.precio),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: Color(0xFF7926F7),
-                                ),
-                              ),
-                            ],
-                          ),
+                            );
+                          },
                         ),
-                      );
-                    },
+                        _buildPaginationControls(
+                          currentPage: _currentServicePage,
+                          totalPages: _totalServicePages,
+                          onPageChange: _changeServicePage,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: serviciosSeleccionados.isNotEmpty
-                          ? const Color(0xFF7926F7)
-                          : Colors.grey.shade300,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 56,
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFF7926F7), width: 2),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          onPressed: _previousStep,
+                          child: const Text(
+                            "Atrás",
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Color(0xFF7926F7),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
                       ),
-                      elevation: 0,
                     ),
-                    onPressed: serviciosSeleccionados.isNotEmpty ? _nextStep : null,
-                    child: const Text(
-                      "Continuar",
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SizedBox(
+                        height: 56,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: serviciosSeleccionados.isNotEmpty
+                                ? const Color(0xFF7926F7)
+                                : Colors.grey.shade300,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            elevation: 0,
+                          ),
+                          onPressed: serviciosSeleccionados.isNotEmpty ? _nextStep : null,
+                          child: const Text(
+                            "Continuar",
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
                 const SizedBox(height: 20),
               ],
@@ -995,77 +1304,90 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
                 ),
                 const SizedBox(height: 20),
                 Expanded(
-                  child: ListView.builder(
-                    padding: EdgeInsets.zero,
-                    itemCount: empleados.length,
-                    itemBuilder: (context, index) {
-                      final empleado = empleados[index];
-                      final isSelected = selectedEmpleado?.documentoEmpleado == empleado.documentoEmpleado;
-                      return GestureDetector(
-                        onTap: () async {
-                          setState(() {
-                            selectedEmpleado = empleado;
-                          });
-                          await _loadEmpleadoHorarios();
-                        },
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: isSelected ? const Color(0xFFE54BCF) : Colors.grey.shade200,
-                              width: isSelected ? 2 : 1,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              const CircleAvatar(
-                                radius: 28,
-                                backgroundColor: Color(0xFFEAD8FF),
-                                child: Icon(Icons.person, color: Color(0xFF7926F7), size: 28),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        ListView.builder(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _displayedEmpleados.length,
+                          itemBuilder: (context, index) {
+                            final empleado = _displayedEmpleados[index];
+                            final isSelected = selectedEmpleado?.documentoEmpleado == empleado.documentoEmpleado;
+                            return GestureDetector(
+                              onTap: () async {
+                                setState(() {
+                                  selectedEmpleado = empleado;
+                                });
+                                await _loadEmpleadoHorarios();
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(
+                                    color: isSelected ? const Color(0xFFE54BCF) : Colors.grey.shade200,
+                                    width: isSelected ? 2 : 1,
+                                  ),
+                                ),
+                                child: Row(
                                   children: [
-                                    Text(
-                                      empleado.nombre,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
+                                    const CircleAvatar(
+                                      radius: 28,
+                                      backgroundColor: Color(0xFFEAD8FF),
+                                      child: Icon(Icons.person, color: Color(0xFF7926F7), size: 28),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            empleado.nombre,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            "Estilista Profesional",
+                                            style: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      "Estilista Profesional",
-                                      style: TextStyle(
-                                        color: Colors.grey[600],
-                                        fontSize: 12,
-                                      ),
-                                    ),
+                                    if (isSelected)
+                                      Container(
+                                        width: 24,
+                                        height: 24,
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFFE54BCF),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.check, color: Colors.white, size: 16),
+                                      )
+                                    else
+                                      Icon(Icons.arrow_forward_ios, color: Colors.grey[400], size: 18),
                                   ],
                                 ),
                               ),
-                              if (isSelected)
-                                Container(
-                                  width: 24,
-                                  height: 24,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFE54BCF),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.check, color: Colors.white, size: 16),
-                                )
-                              else
-                                Icon(Icons.arrow_forward_ios, color: Colors.grey[400], size: 18),
-                            ],
-                          ),
+                            );
+                          },
                         ),
-                      );
-                    },
+                        _buildPaginationControls(
+                          currentPage: _currentEmpleadoPage,
+                          totalPages: _totalEmpleadoPages,
+                          onPageChange: _changeEmpleadoPage,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -2076,109 +2398,152 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
                 ),
                 const SizedBox(height: 20),
                 Expanded(
-                  child: ListView.builder(
-                    padding: EdgeInsets.zero,
-                    itemCount: clientes.length,
-                    itemBuilder: (context, index) {
-                      final cliente = clientes[index];
-                      final isSelected = selectedCliente?.documentoCliente == cliente.documentoCliente;
-                      return GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            selectedCliente = cliente;
-                          });
-                        },
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: isSelected ? const Color(0xFFE54BCF) : Colors.grey.shade200,
-                              width: isSelected ? 2 : 1,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              const CircleAvatar(
-                                radius: 28,
-                                backgroundColor: Color(0xFFEAD8FF),
-                                child: Icon(Icons.person, color: Color(0xFF7926F7), size: 28),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        ListView.builder(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _displayedClientes.length,
+                          itemBuilder: (context, index) {
+                            final cliente = _displayedClientes[index];
+                            final isSelected = selectedCliente?.documentoCliente == cliente.documentoCliente;
+                            return GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  selectedCliente = cliente;
+                                });
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(
+                                    color: isSelected ? const Color(0xFFE54BCF) : Colors.grey.shade200,
+                                    width: isSelected ? 2 : 1,
+                                  ),
+                                ),
+                                child: Row(
                                   children: [
-                                    Text(
-                                      cliente.nombre,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
+                                    const CircleAvatar(
+                                      radius: 28,
+                                      backgroundColor: Color(0xFFEAD8FF),
+                                      child: Icon(Icons.person, color: Color(0xFF7926F7), size: 28),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            cliente.nombre,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          if (cliente.email != null)
+                                            Text(
+                                              cliente.email!,
+                                              style: TextStyle(
+                                                color: Colors.grey[600],
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          if (cliente.telefono != null)
+                                            Text(
+                                              cliente.telefono!,
+                                              style: TextStyle(
+                                                color: Colors.grey[600],
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                        ],
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
-                                    if (cliente.email != null)
-                                      Text(
-                                        cliente.email!,
-                                        style: TextStyle(
-                                          color: Colors.grey[600],
-                                          fontSize: 12,
+                                    if (isSelected)
+                                      Container(
+                                        width: 24,
+                                        height: 24,
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFFE54BCF),
+                                          shape: BoxShape.circle,
                                         ),
-                                      ),
-                                    if (cliente.telefono != null)
-                                      Text(
-                                        cliente.telefono!,
-                                        style: TextStyle(
-                                          color: Colors.grey[600],
-                                          fontSize: 12,
-                                        ),
+                                        child: const Icon(Icons.check, color: Colors.white, size: 16),
                                       ),
                                   ],
                                 ),
                               ),
-                              if (isSelected)
-                                Container(
-                                  width: 24,
-                                  height: 24,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFE54BCF),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.check, color: Colors.white, size: 16),
-                                ),
-                            ],
-                          ),
+                            );
+                          },
                         ),
-                      );
-                    },
+                        _buildPaginationControls(
+                          currentPage: _currentClientePage,
+                          totalPages: _totalClientePages,
+                          onPageChange: _changeClientePage,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: selectedCliente != null
-                          ? const Color(0xFF7926F7)
-                          : Colors.grey.shade300,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 56,
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFF7926F7), width: 2),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                          child: const Text(
+                            "Atrás",
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Color(0xFF7926F7),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
                       ),
-                      elevation: 0,
                     ),
-                    onPressed: selectedCliente != null ? _nextStep : null,
-                    child: const Text(
-                      "Continuar",
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SizedBox(
+                        height: 56,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: selectedCliente != null
+                                ? const Color(0xFF7926F7)
+                                : Colors.grey.shade300,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            elevation: 0,
+                          ),
+                          onPressed: selectedCliente != null ? _nextStep : null,
+                          child: const Text(
+                            "Continuar",
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
                 const SizedBox(height: 20),
               ],

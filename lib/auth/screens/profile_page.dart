@@ -40,8 +40,6 @@ class _ProfilePageState extends State<ProfilePage> {
   final TextEditingController _direccionController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _documentoController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
 
   @override
   void initState() {
@@ -73,10 +71,10 @@ class _ProfilePageState extends State<ProfilePage> {
       final List<dynamic> allItems = [];
       int page = 1;
       bool hasMore = true;
-      const int pageSize = 100;
       
       while (hasMore) {
-        final url = Uri.parse('http://www.astrhoapp.somee.com$endpoint?page=$page&pageSize=$pageSize');
+        // Usar solo el parámetro 'pagina' sin pageSize, ya que la API maneja su propia paginación
+        final url = Uri.parse('http://www.astrhoapp.somee.com$endpoint?pagina=$page');
         print('Fetching: $url');
         
         final response = await http.get(url, headers: _headers);
@@ -87,12 +85,21 @@ class _ProfilePageState extends State<ProfilePage> {
         if (response.statusCode == 200) {
           final decoded = jsonDecode(response.body);
           List<dynamic> items = [];
+          int totalPaginas = 1;
           
           if (decoded is List) {
             items = decoded;
+            // Si es una lista directa, asumir que es la última página
+            hasMore = false;
           } else if (decoded is Map) {
             // Imprimir todas las claves del mapa para depurar
             print('Response keys: ${decoded.keys}');
+            
+            // Obtener información de paginación
+            totalPaginas = decoded['totalPaginas'] ?? decoded['total_paginas'] ?? 1;
+            final paginaActual = decoded['paginaActual'] ?? decoded['pagina_actual'] ?? page;
+            
+            print('Paginación: página $paginaActual de $totalPaginas');
             
             // Buscar la lista en cualquier propiedad que contenga una lista
             bool foundList = false;
@@ -119,14 +126,14 @@ class _ProfilePageState extends State<ProfilePage> {
             hasMore = false;
           } else {
             allItems.addAll(items);
-            page++;
             
-            // Solo parar si la página tiene menos items que el tamaño solicitado
-            if (items.length < pageSize) {
-              print('Page has fewer items ($items.length) than pageSize ($pageSize), stopping');
+            // Verificar si hay más páginas basándose en la información de paginación
+            if (page >= totalPaginas) {
+              print('Reached last page ($page >= $totalPaginas), stopping');
               hasMore = false;
             } else {
               print('Continuing to next page...');
+              page++;
             }
           }
         } else {
@@ -287,31 +294,6 @@ class _ProfilePageState extends State<ProfilePage> {
       return;
     }
 
-    if (_passwordController.text.isNotEmpty || _confirmPasswordController.text.isNotEmpty) {
-      if (_passwordController.text != _confirmPasswordController.text) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Las contraseñas no coinciden'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
-      }
-      if (_passwordController.text.length < 6) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('La contraseña debe tener al menos 6 caracteres'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
-      }
-    }
-
     setState(() {
       isLoading = true;
     });
@@ -372,28 +354,6 @@ class _ProfilePageState extends State<ProfilePage> {
         }
       }
 
-      // 2. Actualizar contraseña si se proporcionó
-      if (_passwordController.text.isNotEmpty && usuarioData != null) {
-        final usuarioId = usuarioData!['idUsuario'] ?? usuarioData!['usuarioId'];
-        final updateUsuarioData = {
-          'idUsuario': usuarioId,
-          'email': usuarioData!['email'],
-          'contrasena': _passwordController.text,
-          'rolId': usuarioData!['rolId'],
-        };
-
-        final response = await http.put(
-          Uri.parse('http://www.astrhoapp.somee.com/api/Usuarios/$usuarioId'),
-          headers: _headers,
-          body: jsonEncode(updateUsuarioData),
-        );
-
-        if (response.statusCode != 200 && response.statusCode != 204) {
-          success = false;
-          throw Exception('Error al actualizar contraseña: ${response.body}');
-        }
-      }
-
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -404,8 +364,6 @@ class _ProfilePageState extends State<ProfilePage> {
         await _loadProfileData();
         setState(() {
           isEditing = false;
-          _passwordController.clear();
-          _confirmPasswordController.clear();
         });
       }
     } catch (e) {
@@ -435,10 +393,7 @@ class _ProfilePageState extends State<ProfilePage> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            IconButton(
-              icon: const Icon(Icons.arrow_back, color: AppColors.white),
-              onPressed: () => Navigator.pop(context),
-            ),
+            const SizedBox(width: 48),
             Row(
               children: [
                 const Icon(Icons.auto_awesome, color: AppColors.white, size: 24),
@@ -549,23 +504,34 @@ class _ProfilePageState extends State<ProfilePage> {
                             widget.user['rolNombre'] ?? widget.user['rol'] ?? 'N/A',
                             Icons.security,
                           ),
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 56,
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primaryPurple,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                elevation: 0,
+                              ),
+                              onPressed: () {
+                                Navigator.pushNamed(context, '/forgot-password');
+                              },
+                              icon: const Icon(Icons.lock_outline, color: AppColors.white),
+                              label: const Text(
+                                'Cambiar Contraseña',
+                                style: TextStyle(
+                                  color: AppColors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
                           if (isEditing) ...[
-                            const SizedBox(height: 16),
-                            _buildProfileField(
-                              label: 'Nueva Contraseña',
-                              controller: _passwordController,
-                              icon: Icons.lock_outline,
-                              enabled: true,
-                              obscureText: true,
-                            ),
-                            const SizedBox(height: 16),
-                            _buildProfileField(
-                              label: 'Confirmar Contraseña',
-                              controller: _confirmPasswordController,
-                              icon: Icons.lock,
-                              enabled: true,
-                              obscureText: true,
-                            ),
                             const SizedBox(height: 32),
                             Row(
                               children: [
@@ -582,8 +548,6 @@ class _ProfilePageState extends State<ProfilePage> {
                                     onPressed: () {
                                       setState(() {
                                         isEditing = false;
-                                        _passwordController.clear();
-                                        _confirmPasswordController.clear();
                                         _loadProfileData();
                                       });
                                     },

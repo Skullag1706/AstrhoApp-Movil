@@ -29,10 +29,17 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
   ApiService? _apiService;
   List<Agenda> _activeAgendas = [];
   List<Agenda> _historyAgendas = [];
+  List<Agenda> _displayedActiveAgendas = [];
+  List<Agenda> _displayedHistoryAgendas = [];
   bool _isLoading = true;
   String _selectedTab = 'Próximas';
   int _activeCount = 0;
   int _historyCount = 0;
+  int _currentActivePage = 1;
+  int _totalActivePages = 1;
+  int _currentHistoryPage = 1;
+  int _totalHistoryPages = 1;
+  final int _citasPerPage = 5;
   Map<dynamic, dynamic>? user;
 
   @override
@@ -52,12 +59,7 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            IconButton(
-              icon: const Icon(Icons.arrow_back, color: AppColors.white),
-              onPressed: () {
-                Navigator.pushReplacementNamed(context, '/home');
-              },
-            ),
+            const SizedBox(width: 48),
             Row(
               children: [
                 Container(
@@ -393,21 +395,39 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
           : await _apiService!.getAgendas();
 
       if (mounted) {
+        final activeList = agendas.where((a) {
+          final estado = a.nombreEstado?.toLowerCase() ?? '';
+          return estado.contains('pendiente') ||
+              estado.contains('confirmado') ||
+              estado.contains('confirmada');
+        }).toList();
+        
+        final historyList = agendas.where((a) {
+          final estado = a.nombreEstado?.toLowerCase() ?? '';
+          return !estado.contains('pendiente') &&
+              !estado.contains('confirmado') &&
+              !estado.contains('confirmada');
+        }).toList();
+
         setState(() {
-          _activeAgendas = agendas.where((a) {
-            final estado = a.nombreEstado?.toLowerCase() ?? '';
-            return estado.contains('pendiente') ||
-                estado.contains('confirmado') ||
-                estado.contains('confirmada');
-          }).toList();
-          _historyAgendas = agendas.where((a) {
-            final estado = a.nombreEstado?.toLowerCase() ?? '';
-            return !estado.contains('pendiente') &&
-                !estado.contains('confirmado') &&
-                !estado.contains('confirmada');
-          }).toList();
+          _activeAgendas = activeList;
+          _historyAgendas = historyList;
           _activeCount = _activeAgendas.length;
           _historyCount = _historyAgendas.length;
+          
+          // Calculate total pages
+          _totalActivePages = (_activeAgendas.length / _citasPerPage).ceil();
+          _totalHistoryPages = (_historyAgendas.length / _citasPerPage).ceil();
+          
+          // Ensure pages are at least 1
+          if (_totalActivePages == 0) _totalActivePages = 1;
+          if (_totalHistoryPages == 0) _totalHistoryPages = 1;
+          
+          // Reset to first page
+          _currentActivePage = 1;
+          _currentHistoryPage = 1;
+          
+          _updateDisplayedAgendas();
           _isLoading = false;
         });
       }
@@ -417,6 +437,8 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
           _isLoading = false;
           _activeAgendas = [];
           _historyAgendas = [];
+          _displayedActiveAgendas = [];
+          _displayedHistoryAgendas = [];
           _activeCount = 0;
           _historyCount = 0;
         });
@@ -428,6 +450,36 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
           ),
         );
       }
+    }
+  }
+
+  void _updateDisplayedAgendas() {
+    // Update active agendas for current page
+    final activeStart = (_currentActivePage - 1) * _citasPerPage;
+    final activeEnd = (activeStart + _citasPerPage).clamp(0, _activeAgendas.length);
+    _displayedActiveAgendas = _activeAgendas.sublist(activeStart, activeEnd);
+    
+    // Update history agendas for current page
+    final historyStart = (_currentHistoryPage - 1) * _citasPerPage;
+    final historyEnd = (historyStart + _citasPerPage).clamp(0, _historyAgendas.length);
+    _displayedHistoryAgendas = _historyAgendas.sublist(historyStart, historyEnd);
+  }
+
+  void _changeActivePage(int newPage) {
+    if (newPage != _currentActivePage && newPage >= 1 && newPage <= _totalActivePages) {
+      setState(() {
+        _currentActivePage = newPage;
+        _updateDisplayedAgendas();
+      });
+    }
+  }
+
+  void _changeHistoryPage(int newPage) {
+    if (newPage != _currentHistoryPage && newPage >= 1 && newPage <= _totalHistoryPages) {
+      setState(() {
+        _currentHistoryPage = newPage;
+        _updateDisplayedAgendas();
+      });
     }
   }
 
@@ -458,7 +510,160 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
   }
 
   List<Agenda> get _currentAgendas {
-    return _selectedTab == 'Próximas' ? _activeAgendas : _historyAgendas;
+    return _selectedTab == 'Próximas' ? _displayedActiveAgendas : _displayedHistoryAgendas;
+  }
+
+  int get _currentPage {
+    return _selectedTab == 'Próximas' ? _currentActivePage : _currentHistoryPage;
+  }
+
+  int get _totalPages {
+    return _selectedTab == 'Próximas' ? _totalActivePages : _totalHistoryPages;
+  }
+
+  void _changePage(int newPage) {
+    if (_selectedTab == 'Próximas') {
+      _changeActivePage(newPage);
+    } else {
+      _changeHistoryPage(newPage);
+    }
+  }
+
+  Widget _buildPaginationControls() {
+    if (_totalPages <= 1) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: Colors.grey[200]!, width: 1),
+        ),
+      ),
+      child: Column(
+        children: [
+          Text(
+            'Página $_currentPage de $_totalPages',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _paginationBtn(
+                Icons.chevron_left,
+                _currentPage > 1 ? () => _changePage(_currentPage - 1) : null,
+                'Anterior',
+              ),
+              const SizedBox(width: 12),
+              ..._buildPageNumbers(),
+              const SizedBox(width: 12),
+              _paginationBtn(
+                Icons.chevron_right,
+                _currentPage < _totalPages ? () => _changePage(_currentPage + 1) : null,
+                'Siguiente',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildPageNumbers() {
+    List<Widget> pages = [];
+    
+    int startPage = 1;
+    int endPage = _totalPages;
+    
+    // Show only 2 pages at a time to avoid hiding pagination buttons
+    if (_totalPages > 2) {
+      startPage = (_currentPage - 1).clamp(1, _totalPages - 1);
+      endPage = (startPage + 1).clamp(1, _totalPages);
+    }
+    
+    if (startPage > 1) {
+      pages.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text('...', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+        ),
+      );
+    }
+    
+    for (int i = startPage; i <= endPage; i++) {
+      pages.add(const SizedBox(width: 4));
+      pages.add(_pageNumber(i, _currentPage == i));
+      pages.add(const SizedBox(width: 4));
+    }
+    
+    if (endPage < _totalPages) {
+      pages.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text('...', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+        ),
+      );
+    }
+    
+    return pages;
+  }
+
+  Widget _paginationBtn(IconData icon, VoidCallback? onTap, String tooltip) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: onTap != null ? Colors.grey[100] : Colors.grey[50],
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: onTap != null ? Colors.grey[300]! : Colors.grey[200]!,
+              width: 1,
+            ),
+          ),
+          alignment: Alignment.center,
+          child: Icon(
+            icon,
+            size: 18,
+            color: onTap != null ? Colors.grey[600] : Colors.grey[300],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _pageNumber(int page, bool isActive) {
+    return GestureDetector(
+      onTap: () => _changePage(page),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFF7926F7) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: isActive
+              ? Border.all(color: const Color(0xFF7926F7), width: 2)
+              : Border.all(color: Colors.grey[300]!, width: 1),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          '$page',
+          style: TextStyle(
+            color: isActive ? Colors.white : Colors.grey[600],
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -522,18 +727,27 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
                                   ],
                                 ),
                               )
-                            : RefreshIndicator(
-                                onRefresh: _loadAgendas,
-                                child: ListView.builder(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 20,
-                                    vertical: 10,
-                                  ),
-                                  itemCount: _currentAgendas.length,
-                                  itemBuilder: (context, index) {
-                                    final agenda = _currentAgendas[index];
-                                    return _buildAppointmentCard(agenda);
-                                  },
+                            : SingleChildScrollView(
+                                child: Column(
+                                  children: [
+                                    RefreshIndicator(
+                                      onRefresh: _loadAgendas,
+                                      child: ListView.builder(
+                                        physics: const NeverScrollableScrollPhysics(),
+                                        shrinkWrap: true,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 20,
+                                          vertical: 10,
+                                        ),
+                                        itemCount: _currentAgendas.length,
+                                        itemBuilder: (context, index) {
+                                          final agenda = _currentAgendas[index];
+                                          return _buildAppointmentCard(agenda);
+                                        },
+                                      ),
+                                    ),
+                                    _buildPaginationControls(),
+                                  ],
                                 ),
                               ),
                   ),
