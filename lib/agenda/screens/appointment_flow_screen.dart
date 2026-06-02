@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../models/agenda.dart';
 import 'package:astrhoapp/core/services/api_service.dart';
 import 'package:astrhoapp/core/utils/colors.dart';
+import 'package:astrhoapp/core/widgets/custom_alert.dart';
 
 // Enumeración para el estado de un slot de tiempo
 enum TimeSlotStatus {
@@ -79,6 +80,25 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
   List<Cliente> _displayedClientes = [];
   List<Servicio> _displayedServicios = [];
   List<Empleado> _displayedEmpleados = [];
+  
+  // Search filters
+  String _servicioSearchQuery = '';
+  List<Servicio> _serviciosFiltered = [];
+  late TextEditingController _servicioSearchController;
+  
+  String _clienteSearchQuery = '';
+  List<Cliente> _clientesFiltered = [];
+  late TextEditingController _clienteSearchController;
+  int _currentClienteFilteredPage = 1;
+  int _totalClienteFilteredPages = 1;
+  List<Cliente> _displayedClientesFiltered = [];
+  
+  String _empleadoSearchQuery = '';
+  List<Empleado> _empleadosFiltered = [];
+  late TextEditingController _empleadoSearchController;
+  int _currentEmpleadoFilteredPage = 1;
+  int _totalEmpleadoFilteredPages = 1;
+  List<Empleado> _displayedEmpleadosFiltered = [];
 
   // Lógica de roles
   bool get isCliente =>
@@ -99,6 +119,12 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
     super.initState();
     _apiService = ApiService(token: widget.token);
     _pageController = PageController(initialPage: 0);
+    _servicioSearchController = TextEditingController();
+    _servicioSearchController.addListener(_onServiceSearchChanged);
+    _clienteSearchController = TextEditingController();
+    _clienteSearchController.addListener(_onClienteSearchChanged);
+    _empleadoSearchController = TextEditingController();
+    _empleadoSearchController.addListener(_onEmpleadoSearchChanged);
     _loadInitialData();
   }
 
@@ -235,8 +261,10 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
         }
       }
 
-      serviciosDisponibles = allServicios;
-      print('Total servicios cargados de todas las páginas: ${serviciosDisponibles.length}');
+      // Filtrar solo servicios activos
+      serviciosDisponibles = allServicios.where((s) => s.estado == true).toList();
+      print('Total servicios cargados: ${allServicios.length}');
+      print('Total servicios activos: ${serviciosDisponibles.length}');
     } catch (e) {
       print('Error cargando todos los servicios: $e');
       serviciosDisponibles = [];
@@ -245,24 +273,48 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
 
   // Pagination helper methods
   void _updatePaginationForClientes() {
+    // Inicializar lista filtrada si está vacía
+    if (_clientesFiltered.isEmpty) {
+      _clientesFiltered = List.from(clientes);
+    }
     _totalClientePages = (clientes.length / _itemsPerPage).ceil();
     if (_totalClientePages == 0) _totalClientePages = 1;
     _currentClientePage = 1;
     _updateDisplayedClientes();
+    
+    // También inicializar páginas filtradas
+    _totalClienteFilteredPages = (_clientesFiltered.length / _itemsPerPage).ceil();
+    if (_totalClienteFilteredPages == 0) _totalClienteFilteredPages = 1;
+    _currentClienteFilteredPage = 1;
+    _updateDisplayedClientesFiltered();
   }
 
   void _updatePaginationForServicios() {
-    _totalServicePages = (serviciosDisponibles.length / _itemsPerPage).ceil();
+    // Inicializar lista filtrada si está vacía
+    if (_serviciosFiltered.isEmpty) {
+      _serviciosFiltered = List.from(serviciosDisponibles);
+    }
+    _totalServicePages = (_serviciosFiltered.length / _itemsPerPage).ceil();
     if (_totalServicePages == 0) _totalServicePages = 1;
     _currentServicePage = 1;
-    _updateDisplayedServicios();
+    _updateDisplayedServiciosFiltered();
   }
 
   void _updatePaginationForEmpleados() {
+    // Inicializar lista filtrada si está vacía
+    if (_empleadosFiltered.isEmpty) {
+      _empleadosFiltered = List.from(empleados);
+    }
     _totalEmpleadoPages = (empleados.length / _itemsPerPage).ceil();
     if (_totalEmpleadoPages == 0) _totalEmpleadoPages = 1;
     _currentEmpleadoPage = 1;
     _updateDisplayedEmpleados();
+    
+    // También inicializar páginas filtradas
+    _totalEmpleadoFilteredPages = (_empleadosFiltered.length / _itemsPerPage).ceil();
+    if (_totalEmpleadoFilteredPages == 0) _totalEmpleadoFilteredPages = 1;
+    _currentEmpleadoFilteredPage = 1;
+    _updateDisplayedEmpleadosFiltered();
   }
 
   void _updateDisplayedClientes() {
@@ -271,16 +323,86 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
     _displayedClientes = clientes.sublist(start, end);
   }
 
-  void _updateDisplayedServicios() {
+  void _filterServicios(String query) {
+    setState(() {
+      _servicioSearchQuery = query.toLowerCase();
+      if (_servicioSearchQuery.isEmpty) {
+        _serviciosFiltered = List.from(serviciosDisponibles);
+      } else {
+        _serviciosFiltered = serviciosDisponibles
+            .where((s) =>
+                s.nombre.toLowerCase().contains(_servicioSearchQuery) ||
+                (s.descripcion?.toLowerCase().contains(_servicioSearchQuery) ??
+                    false))
+            .toList();
+      }
+      _currentServicePage = 1;
+      _totalServicePages = (_serviciosFiltered.length / _itemsPerPage).ceil();
+      if (_totalServicePages == 0) _totalServicePages = 1;
+      _updateDisplayedServiciosFiltered();
+    });
+  }
+
+  void _updateDisplayedServiciosFiltered() {
     final start = (_currentServicePage - 1) * _itemsPerPage;
-    final end = (start + _itemsPerPage).clamp(0, serviciosDisponibles.length);
-    _displayedServicios = serviciosDisponibles.sublist(start, end);
+    final end = (start + _itemsPerPage).clamp(0, _serviciosFiltered.length);
+    _displayedServicios = _serviciosFiltered.sublist(start, end);
   }
 
   void _updateDisplayedEmpleados() {
     final start = (_currentEmpleadoPage - 1) * _itemsPerPage;
     final end = (start + _itemsPerPage).clamp(0, empleados.length);
     _displayedEmpleados = empleados.sublist(start, end);
+  }
+
+  void _filterClientes(String query) {
+    setState(() {
+      _clienteSearchQuery = query.toLowerCase();
+      if (_clienteSearchQuery.isEmpty) {
+        _clientesFiltered = List.from(clientes);
+      } else {
+        _clientesFiltered = clientes
+            .where((c) =>
+                c.nombre.toLowerCase().contains(_clienteSearchQuery) ||
+                c.documentoCliente.toLowerCase().contains(_clienteSearchQuery))
+            .toList();
+      }
+      _currentClienteFilteredPage = 1;
+      _totalClienteFilteredPages = (_clientesFiltered.length / _itemsPerPage).ceil();
+      if (_totalClienteFilteredPages == 0) _totalClienteFilteredPages = 1;
+      _updateDisplayedClientesFiltered();
+    });
+  }
+
+  void _updateDisplayedClientesFiltered() {
+    final start = (_currentClienteFilteredPage - 1) * _itemsPerPage;
+    final end = (start + _itemsPerPage).clamp(0, _clientesFiltered.length);
+    _displayedClientesFiltered = _clientesFiltered.sublist(start, end);
+  }
+
+  void _filterEmpleados(String query) {
+    setState(() {
+      _empleadoSearchQuery = query.toLowerCase();
+      if (_empleadoSearchQuery.isEmpty) {
+        _empleadosFiltered = List.from(empleados);
+      } else {
+        _empleadosFiltered = empleados
+            .where((e) =>
+                e.nombre.toLowerCase().contains(_empleadoSearchQuery) ||
+                e.documentoEmpleado.toLowerCase().contains(_empleadoSearchQuery))
+            .toList();
+      }
+      _currentEmpleadoFilteredPage = 1;
+      _totalEmpleadoFilteredPages = (_empleadosFiltered.length / _itemsPerPage).ceil();
+      if (_totalEmpleadoFilteredPages == 0) _totalEmpleadoFilteredPages = 1;
+      _updateDisplayedEmpleadosFiltered();
+    });
+  }
+
+  void _updateDisplayedEmpleadosFiltered() {
+    final start = (_currentEmpleadoFilteredPage - 1) * _itemsPerPage;
+    final end = (start + _itemsPerPage).clamp(0, _empleadosFiltered.length);
+    _displayedEmpleadosFiltered = _empleadosFiltered.sublist(start, end);
   }
 
   void _changeClientePage(int newPage) {
@@ -296,7 +418,7 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
     if (newPage != _currentServicePage && newPage >= 1 && newPage <= _totalServicePages) {
       setState(() {
         _currentServicePage = newPage;
-        _updateDisplayedServicios();
+        _updateDisplayedServiciosFiltered();
       });
     }
   }
@@ -308,6 +430,36 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
         _updateDisplayedEmpleados();
       });
     }
+  }
+
+  void _changeClienteFilteredPage(int newPage) {
+    if (newPage != _currentClienteFilteredPage && newPage >= 1 && newPage <= _totalClienteFilteredPages) {
+      setState(() {
+        _currentClienteFilteredPage = newPage;
+        _updateDisplayedClientesFiltered();
+      });
+    }
+  }
+
+  void _changeEmpleadoFilteredPage(int newPage) {
+    if (newPage != _currentEmpleadoFilteredPage && newPage >= 1 && newPage <= _totalEmpleadoFilteredPages) {
+      setState(() {
+        _currentEmpleadoFilteredPage = newPage;
+        _updateDisplayedEmpleadosFiltered();
+      });
+    }
+  }
+
+  void _onServiceSearchChanged() {
+    _filterServicios(_servicioSearchController.text);
+  }
+
+  void _onClienteSearchChanged() {
+    _filterClientes(_clienteSearchController.text);
+  }
+
+  void _onEmpleadoSearchChanged() {
+    _filterEmpleados(_empleadoSearchController.text);
   }
 
   Widget _buildPaginationControls({
@@ -543,18 +695,6 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
     } catch (_) {
       return false;
     }
-  }
-
-  // Obtener la duración total en minutos de los servicios seleccionados
-  int _getTotalDurationMinutes() {
-    int total = 0;
-    for (final servicio in serviciosDisponibles) {
-      if (serviciosSeleccionados.contains(servicio.servicioId)) {
-        total += servicio.duracion;
-      }
-    }
-    // Si no hay servicios seleccionados, usar 30 minutos por defecto
-    return total > 0 ? total : 30;
   }
 
   // Calcular horarios disponibles (RESTRICCIÓN MANUAL 100% PRIORITARIA)
@@ -858,22 +998,12 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
   }
 
   // Generar horarios por defecto (solo para compatibilidad)
-  @Deprecated('Usar _calculateAvailableSlots en su lugar')
-  List<String> _generateDefaultSlots() {
-    final slots = <String>[];
-    var currentTime = DateTime(2000, 1, 1, 9, 0); // 9:00 AM
-    final endTime = DateTime(2000, 1, 1, 18, 0); // 6:00 PM
-
-    while (currentTime.isBefore(endTime)) {
-      slots.add(_formatTime12Hour(currentTime));
-      currentTime = currentTime.add(const Duration(minutes: 30));
-    }
-    return slots;
-  }
-
   @override
   void dispose() {
     _pageController.dispose();
+    _servicioSearchController.dispose();
+    _clienteSearchController.dispose();
+    _empleadoSearchController.dispose();
     super.dispose();
   }
 
@@ -984,63 +1114,86 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
   }
 
   Widget _stepIndicator() {
-    const stepLabels = ["Servicios", "Profesional", "Confirmación"];
+    // Determinar los pasos según el rol con abreviaturas cortas
+    List<String> stepLabels = [];
+    
+    if (isCliente) {
+      // Cliente: Servicios > Metodo > Profesional > Fecha > Confirmación
+      stepLabels = ["Servicios", "Método", "Prof.", "Fecha", "Conf."];
+    } else if (isAdmin) {
+      // Admin: Cliente > Servicios > Metodo > Profesional > Fecha > Confirmación
+      stepLabels = ["Cliente", "Servicios", "Método", "Prof.", "Fecha", "Conf."];
+    } else if (isAsistente) {
+      // Empleado: Cliente > Servicios > Metodo > Fecha > Confirmación
+      stepLabels = ["Cliente", "Servicios", "Método", "Fecha", "Conf."];
+    }
+    
+    // Calcular el índice visual del paso actual
+    int visualStep = currentStep;
+    
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: Row(
-        children: List.generate(3, (index) {
-          return Expanded(
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    if (index > 0)
-                      Expanded(
-                        child: Container(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(stepLabels.length, (index) {
+            return SizedBox(
+              width: 70,
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (index > 0)
+                        Container(
+                          width: 15,
                           height: 2,
-                          color: index <= currentStep
-                              ? const Color(0xFFE54BCF)
+                          color: index <= visualStep
+                              ? AppColors.primaryPink
                               : Colors.grey.shade300,
                         ),
-                      ),
-                    _stepCircle(index),
-                    if (index < 2)
-                      Expanded(
-                        child: Container(
+                      _stepCircle(index, visualStep),
+                      if (index < stepLabels.length - 1)
+                        Container(
+                          width: 15,
                           height: 2,
-                          color: index < currentStep
-                              ? const Color(0xFFE54BCF)
+                          color: index < visualStep
+                              ? AppColors.primaryPink
                               : Colors.grey.shade300,
                         ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  stepLabels[index],
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: index <= currentStep
-                        ? const Color(0xFFE54BCF)
-                        : Colors.grey.shade400,
+                    ],
                   ),
-                ),
-              ],
-            ),
-          );
-        }),
+                  const SizedBox(height: 8),
+                  Text(
+                    stepLabels[index],
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: index <= visualStep
+                          ? AppColors.primaryPink
+                          : Colors.grey.shade400,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            );
+          }),
+        ),
       ),
     );
   }
 
-  Widget _stepCircle(int index) {
-    bool active = index <= currentStep;
+  Widget _stepCircle(int index, int visualStep) {
+    bool active = index <= visualStep;
     return Container(
       width: 32,
       height: 32,
       decoration: BoxDecoration(
-        color: active ? const Color(0xFFE54BCF) : Colors.grey.shade300,
+        color: active ? AppColors.primaryPink : Colors.grey.shade300,
         shape: BoxShape.circle,
       ),
       child: active
@@ -1083,13 +1236,14 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.grey.shade200),
                   ),
-                  child: const TextField(
+                  child: TextField(
+                    controller: _servicioSearchController,
                     decoration: InputDecoration(
                       hintText: "¿Qué servicio buscas?",
-                      hintStyle: TextStyle(color: Colors.grey),
-                      prefixIcon: Icon(Icons.search, color: Colors.grey),
+                      hintStyle: const TextStyle(color: Colors.grey),
+                      prefixIcon: const Icon(Icons.search, color: Colors.grey),
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                     ),
                   ),
                 ),
@@ -1281,24 +1435,25 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  "Elige al estilista que te atenderá",
+                  "Busca al estilista que te atenderá",
                   style: TextStyle(color: Colors.grey[600], fontSize: 14),
                 ),
                 const SizedBox(height: 20),
-                // Buscador
+                // Buscador local
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.grey.shade200),
                   ),
-                  child: const TextField(
+                  child: TextField(
+                    controller: _empleadoSearchController,
                     decoration: InputDecoration(
-                      hintText: "Buscar por nombre o especialidad...",
-                      hintStyle: TextStyle(color: Colors.grey),
-                      prefixIcon: Icon(Icons.search, color: Colors.grey),
+                      hintText: "Buscar profesional por nombre o documento...",
+                      hintStyle: const TextStyle(color: Colors.grey),
+                      prefixIcon: const Icon(Icons.search, color: Colors.grey),
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                     ),
                   ),
                 ),
@@ -1311,9 +1466,9 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
                           padding: EdgeInsets.zero,
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _displayedEmpleados.length,
+                          itemCount: _displayedEmpleadosFiltered.length,
                           itemBuilder: (context, index) {
-                            final empleado = _displayedEmpleados[index];
+                            final empleado = _displayedEmpleadosFiltered[index];
                             final isSelected = selectedEmpleado?.documentoEmpleado == empleado.documentoEmpleado;
                             return GestureDetector(
                               onTap: () async {
@@ -1335,12 +1490,19 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
                                 ),
                                 child: Row(
                                   children: [
-                                    const CircleAvatar(
-                                      radius: 28,
-                                      backgroundColor: Color(0xFFEAD8FF),
-                                      child: Icon(Icons.person, color: Color(0xFF7926F7), size: 28),
+                                    Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        color: Colors.purple.shade100,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.person,
+                                        color: Color(0xFF7926F7),
+                                      ),
                                     ),
-                                    const SizedBox(width: 16),
+                                    const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1348,48 +1510,85 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
                                           Text(
                                             empleado.nombre,
                                             style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 14,
                                             ),
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
-                                            "Estilista Profesional",
+                                            empleado.documentoEmpleado,
                                             style: TextStyle(
-                                              color: Colors.grey[600],
                                               fontSize: 12,
+                                              color: Colors.grey[600],
                                             ),
                                           ),
                                         ],
                                       ),
                                     ),
                                     if (isSelected)
-                                      Container(
-                                        width: 24,
-                                        height: 24,
-                                        decoration: const BoxDecoration(
-                                          color: Color(0xFFE54BCF),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(Icons.check, color: Colors.white, size: 16),
-                                      )
-                                    else
-                                      Icon(Icons.arrow_forward_ios, color: Colors.grey[400], size: 18),
+                                      const Icon(Icons.check_circle, color: Color(0xFFE54BCF), size: 24),
                                   ],
                                 ),
                               ),
                             );
                           },
                         ),
-                        _buildPaginationControls(
-                          currentPage: _currentEmpleadoPage,
-                          totalPages: _totalEmpleadoPages,
-                          onPageChange: _changeEmpleadoPage,
-                        ),
+                        if (_totalEmpleadoFilteredPages > 1)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 20),
+                            child: _buildPaginationControls(
+                              currentPage: _currentEmpleadoFilteredPage,
+                              totalPages: _totalEmpleadoFilteredPages,
+                              onPageChange: _changeEmpleadoFilteredPage,
+                            ),
+                          ),
                       ],
                     ),
                   ),
                 ),
+                const SizedBox(height: 20),
+                if (selectedEmpleado != null)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFFE54BCF), width: 2),
+                    ),
+                    child: Row(
+                      children: [
+                        const CircleAvatar(
+                          radius: 28,
+                          backgroundColor: Color(0xFFEAD8FF),
+                          child: Icon(Icons.person, color: Color(0xFF7926F7), size: 28),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                selectedEmpleado!.nombre,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                "Documento: ${selectedEmpleado!.documentoEmpleado}",
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.check_circle, color: Color(0xFFE54BCF), size: 28),
+                      ],
+                    ),
+                  ),
                 const SizedBox(height: 20),
                 Row(
                   children: [
@@ -2358,6 +2557,7 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _topBar(),
+        _stepIndicator(),
         const SizedBox(height: 24),
         Expanded(
           child: Container(
@@ -2375,24 +2575,25 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  "Elige el cliente para la cita",
+                  "Busca y elige el cliente para la cita",
                   style: TextStyle(color: Colors.grey[600], fontSize: 14),
                 ),
                 const SizedBox(height: 20),
-                // Buscador
+                // Buscador local
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.grey.shade200),
                   ),
-                  child: const TextField(
+                  child: TextField(
+                    controller: _clienteSearchController,
                     decoration: InputDecoration(
-                      hintText: "Buscar cliente...",
-                      hintStyle: TextStyle(color: Colors.grey),
-                      prefixIcon: Icon(Icons.search, color: Colors.grey),
+                      hintText: "Buscar cliente por nombre o documento...",
+                      hintStyle: const TextStyle(color: Colors.grey),
+                      prefixIcon: const Icon(Icons.search, color: Colors.grey),
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                     ),
                   ),
                 ),
@@ -2405,9 +2606,9 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
                           padding: EdgeInsets.zero,
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _displayedClientes.length,
+                          itemCount: _displayedClientesFiltered.length,
                           itemBuilder: (context, index) {
-                            final cliente = _displayedClientes[index];
+                            final cliente = _displayedClientesFiltered[index];
                             final isSelected = selectedCliente?.documentoCliente == cliente.documentoCliente;
                             return GestureDetector(
                               onTap: () {
@@ -2428,12 +2629,19 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
                                 ),
                                 child: Row(
                                   children: [
-                                    const CircleAvatar(
-                                      radius: 28,
-                                      backgroundColor: Color(0xFFEAD8FF),
-                                      child: Icon(Icons.person, color: Color(0xFF7926F7), size: 28),
+                                    Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        color: Colors.purple.shade100,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.person,
+                                        color: Color(0xFF7926F7),
+                                      ),
                                     ),
-                                    const SizedBox(width: 16),
+                                    const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2441,55 +2649,85 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
                                           Text(
                                             cliente.nombre,
                                             style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 14,
                                             ),
                                           ),
                                           const SizedBox(height: 4),
-                                          if (cliente.email != null)
-                                            Text(
-                                              cliente.email!,
-                                              style: TextStyle(
-                                                color: Colors.grey[600],
-                                                fontSize: 12,
-                                              ),
+                                          Text(
+                                            cliente.documentoCliente,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey[600],
                                             ),
-                                          if (cliente.telefono != null)
-                                            Text(
-                                              cliente.telefono!,
-                                              style: TextStyle(
-                                                color: Colors.grey[600],
-                                                fontSize: 12,
-                                              ),
-                                            ),
+                                          ),
                                         ],
                                       ),
                                     ),
                                     if (isSelected)
-                                      Container(
-                                        width: 24,
-                                        height: 24,
-                                        decoration: const BoxDecoration(
-                                          color: Color(0xFFE54BCF),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(Icons.check, color: Colors.white, size: 16),
-                                      ),
+                                      const Icon(Icons.check_circle, color: Color(0xFFE54BCF), size: 24),
                                   ],
                                 ),
                               ),
                             );
                           },
                         ),
-                        _buildPaginationControls(
-                          currentPage: _currentClientePage,
-                          totalPages: _totalClientePages,
-                          onPageChange: _changeClientePage,
-                        ),
+                        if (_totalClienteFilteredPages > 1)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 20),
+                            child: _buildPaginationControls(
+                              currentPage: _currentClienteFilteredPage,
+                              totalPages: _totalClienteFilteredPages,
+                              onPageChange: _changeClienteFilteredPage,
+                            ),
+                          ),
                       ],
                     ),
                   ),
                 ),
+                const SizedBox(height: 20),
+                if (selectedCliente != null)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFFE54BCF), width: 2),
+                    ),
+                    child: Row(
+                      children: [
+                        const CircleAvatar(
+                          radius: 28,
+                          backgroundColor: Color(0xFFEAD8FF),
+                          child: Icon(Icons.person, color: Color(0xFF7926F7), size: 28),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                selectedCliente!.nombre,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                "Documento: ${selectedCliente!.documentoCliente}",
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.check_circle, color: Color(0xFFE54BCF), size: 28),
+                      ],
+                    ),
+                  ),
                 const SizedBox(height: 20),
                 Row(
                   children: [
@@ -2634,14 +2872,10 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(widget.agendaToEdit != null 
-                ? 'Error al actualizar la cita: $e' 
-                : 'Error al crear la cita: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        final message = widget.agendaToEdit != null 
+            ? 'Error al actualizar la cita: $e' 
+            : 'Error al crear la cita: $e';
+        CustomAlert.showError(context, message);
       }
     } finally {
       if (mounted) {

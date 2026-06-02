@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:astrhoapp/core/services/auth_service.dart';
 import 'package:astrhoapp/core/utils/colors.dart';
+import 'package:astrhoapp/core/widgets/custom_alert.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
-  const ForgotPasswordPage({super.key});
+  final String? initialEmail;
+  
+  const ForgotPasswordPage({super.key, this.initialEmail});
 
   @override
   _ForgotPasswordPageState createState() => _ForgotPasswordPageState();
@@ -13,6 +16,21 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   final TextEditingController emailCtrl = TextEditingController();
   bool loading = false;
   String? emailError;
+
+  @override
+  void initState() {
+    super.initState();
+    // Si se proporciona un email inicial, cargarlo en el campo
+    if (widget.initialEmail != null && widget.initialEmail!.isNotEmpty) {
+      emailCtrl.text = widget.initialEmail!;
+    }
+  }
+
+  @override
+  void dispose() {
+    emailCtrl.dispose();
+    super.dispose();
+  }
 
   String? validateEmail(String? value) {
     if (value == null || value.isEmpty) {
@@ -43,12 +61,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
       if (token != null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Código enviado a tu correo"),
-              backgroundColor: Colors.green,
-            ),
-          );
+          CustomAlert.showSuccess(context, "Código enviado a tu correo");
           Navigator.pushNamed(
             context,
             '/confirm-code',
@@ -57,23 +70,13 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Error al recuperar contraseña"),
-              backgroundColor: Colors.red,
-            ),
-          );
+          CustomAlert.showError(context, "Error al recuperar contraseña");
         }
       }
     } catch (e) {
       setState(() => loading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error de conexión: $e"),
-            backgroundColor: Colors.red,
-          ),
-        );
+        CustomAlert.showError(context, "Error de conexión: $e");
       }
     }
   }

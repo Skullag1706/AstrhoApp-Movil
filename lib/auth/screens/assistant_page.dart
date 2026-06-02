@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:astrhoapp/core/utils/colors.dart';
-import 'package:astrhoapp/agenda/screens/appointment_flow_screen.dart';
 import 'package:astrhoapp/agenda/screens/mis_citas_screen.dart';
 import 'package:astrhoapp/services/screens/services_page.dart';
 import 'package:astrhoapp/auth/screens/profile_page.dart';
@@ -111,15 +110,10 @@ class _AsistentePageState extends State<AsistentePage> {
                         height: 56,
                         child: ElevatedButton(
                           onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => AppointmentFlowScreen(
-                                  user: user,
-                                  token: user?['token']?.toString(),
-                                ),
-                              ),
-                            );
+                            setState(() {
+                              _currentPageIndex = 2;
+                              _pageController.jumpToPage(2);
+                            });
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primaryPurple,

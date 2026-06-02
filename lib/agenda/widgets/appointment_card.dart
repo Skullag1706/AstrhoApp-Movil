@@ -20,13 +20,13 @@ class AppointmentCard extends StatelessWidget {
   Color getStatusColor() {
     final estado = agenda.nombreEstado?.toLowerCase() ?? '';
     if (estado.contains('confirmado') || estado.contains('confirmada')) {
-      return AppColors.confirmedBlue;
+      return AppColors.statusConfirmed;
     } else if (estado.contains('pendiente')) {
-      return AppColors.pendingOrange;
+      return AppColors.statusPending;
     } else if (estado.contains('cancelado') || estado.contains('cancelada')) {
-      return Colors.red;
+      return AppColors.statusCancelled;
     } else if (estado.contains('completado') || estado.contains('completada')) {
-      return Colors.green;
+      return AppColors.statusCompleted;
     }
     return AppColors.textGray;
   }
@@ -34,13 +34,13 @@ class AppointmentCard extends StatelessWidget {
   Color getStatusBackgroundColor() {
     final estado = agenda.nombreEstado?.toLowerCase() ?? '';
     if (estado.contains('confirmado') || estado.contains('confirmada')) {
-      return AppColors.confirmedBlue;
+      return AppColors.statusConfirmed;
     } else if (estado.contains('pendiente')) {
-      return AppColors.pendingOrange;
+      return AppColors.statusPending;
     } else if (estado.contains('cancelado') || estado.contains('cancelada')) {
-      return Colors.red;
+      return AppColors.statusCancelled;
     } else if (estado.contains('completado') || estado.contains('completada')) {
-      return Colors.green;
+      return AppColors.statusCompleted;
     }
     return AppColors.textGray;
   }
@@ -79,7 +79,7 @@ class AppointmentCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -265,7 +265,7 @@ class AppointmentCard extends StatelessWidget {
                     value: 'delete',
                     child: Row(
                       children: [
-                        Icon(Icons.delete, color: AppColors.pendingOrange),
+                        Icon(Icons.delete, color: AppColors.statusCancelled),
                         SizedBox(width: 8),
                         Text('Eliminar'),
                       ],

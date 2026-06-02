@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/services/auth_service.dart';
 import 'package:astrhoapp/core/utils/colors.dart';
+import 'package:astrhoapp/core/widgets/custom_alert.dart';
 
 class ConfirmCodePage extends StatefulWidget {
   const ConfirmCodePage({super.key});
@@ -64,12 +65,7 @@ class _ConfirmCodePageState extends State<ConfirmCodePage> {
     if (token == null) {
       setState(() => loading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Token no encontrado"),
-            backgroundColor: Colors.red,
-          ),
-        );
+        CustomAlert.showError(context, "Token no encontrado");
       }
       return;
     }
@@ -94,23 +90,13 @@ class _ConfirmCodePageState extends State<ConfirmCodePage> {
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Código inválido"),
-              backgroundColor: Colors.red,
-            ),
-          );
+          CustomAlert.showError(context, "Código inválido");
         }
       }
     } catch (e) {
       setState(() => loading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error de conexión: $e"),
-            backgroundColor: Colors.red,
-          ),
-        );
+        CustomAlert.showError(context, "Error de conexión: $e");
       }
     }
   }

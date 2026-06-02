@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' show min;
 import 'package:http/http.dart' as http;
 import '/agenda/models/agenda.dart';
 
@@ -874,40 +875,65 @@ class ApiService {
   }
 
   List<Cliente> _parseClienteList(String body) {
-    if (body.trim().isEmpty) return [];
+    if (body.trim().isEmpty) {
+      print('⚠️ _parseClienteList: body vacío');
+      return [];
+    }
     try {
       final dynamic data = _parseJson(body);
+      print('📦 Datos parseados (tipo): ${data.runtimeType}');
+      
       List<dynamic> list = [];
       if (data is List) {
+        print('✓ Datos es una lista directa');
         list = data;
       } else if (data is Map<String, dynamic>) {
+        print('✓ Datos es un Map, buscando lista...');
         // Buscar lista en propiedades comunes como 'data', 'items', 'values'
         if (data.containsKey('data') && data['data'] is List) {
+          print('  → Encontrado en "data"');
           list = data['data'];
         } else if (data.containsKey('items') && data['items'] is List) {
+          print('  → Encontrado en "items"');
           list = data['items'];
+        } else if (data.containsKey('clientes') && data['clientes'] is List) {
+          print('  → Encontrado en "clientes"');
+          list = data['clientes'];
         } else {
-          for (var value in data.values) {
-            if (value is List) {
-              list = value;
+          print('  → Buscando primera propiedad que sea lista...');
+          for (var entry in data.entries) {
+            if (entry.value is List) {
+              print('  → Encontrado en "${entry.key}"');
+              list = entry.value;
               break;
             }
           }
         }
       }
-      return list
+      
+      print('📋 Items a procesar: ${list.length}');
+      final result = list
           .map((json) {
             try {
-              return Cliente.fromJson(json as Map<String, dynamic>);
+              if (json is! Map<String, dynamic>) {
+                print('  ⚠️ Ignorando item que no es Map: ${json.runtimeType}');
+                return null;
+              }
+              return Cliente.fromJson(json);
             } catch (e) {
+              print('  ⚠️ Error parseando cliente: $e | JSON: $json');
               return null;
             }
           })
           .where((c) => c != null)
           .cast<Cliente>()
           .toList();
+      
+      print('✅ Clientes parseados exitosamente: ${result.length}');
+      return result;
     } catch (e) {
-      print('Error parseando lista de clientes: $e');
+      print('❌ Error en _parseClienteList: $e');
+      print('📝 Body: ${body.substring(0, min(300, body.length))}...');
       return [];
     }
   }
@@ -954,39 +980,64 @@ class ApiService {
   }
 
   List<Empleado> _parseEmpleadoList(String body) {
-    if (body.trim().isEmpty) return [];
+    if (body.trim().isEmpty) {
+      print('⚠️ _parseEmpleadoList: body vacío');
+      return [];
+    }
     try {
       final dynamic data = _parseJson(body);
+      print('📦 Datos parseados (tipo): ${data.runtimeType}');
+      
       List<dynamic> list = [];
       if (data is List) {
+        print('✓ Datos es una lista directa');
         list = data;
       } else if (data is Map<String, dynamic>) {
+        print('✓ Datos es un Map, buscando lista...');
         if (data.containsKey('data') && data['data'] is List) {
+          print('  → Encontrado en "data"');
           list = data['data'];
         } else if (data.containsKey('items') && data['items'] is List) {
+          print('  → Encontrado en "items"');
           list = data['items'];
+        } else if (data.containsKey('empleados') && data['empleados'] is List) {
+          print('  → Encontrado en "empleados"');
+          list = data['empleados'];
         } else {
-          for (var value in data.values) {
-            if (value is List) {
-              list = value;
+          print('  → Buscando primera propiedad que sea lista...');
+          for (var entry in data.entries) {
+            if (entry.value is List) {
+              print('  → Encontrado en "${entry.key}"');
+              list = entry.value;
               break;
             }
           }
         }
       }
-      return list
+      
+      print('📋 Items a procesar: ${list.length}');
+      final result = list
           .map((json) {
             try {
-              return Empleado.fromJson(json as Map<String, dynamic>);
+              if (json is! Map<String, dynamic>) {
+                print('  ⚠️ Ignorando item que no es Map: ${json.runtimeType}');
+                return null;
+              }
+              return Empleado.fromJson(json);
             } catch (e) {
+              print('  ⚠️ Error parseando empleado: $e | JSON: $json');
               return null;
             }
           })
           .where((e) => e != null)
           .cast<Empleado>()
           .toList();
+      
+      print('✅ Empleados parseados exitosamente: ${result.length}');
+      return result;
     } catch (e) {
-      print('Error parseando lista de empleados: $e');
+      print('❌ Error en _parseEmpleadoList: $e');
+      print('📝 Body: ${body.substring(0, min(300, body.length))}...');
       return [];
     }
   }
@@ -1184,6 +1235,93 @@ class ApiService {
       return [];
     } catch (e) {
       print('❌ Excepción al obtener horas disponibles: $e');
+      return [];
+    }
+  }
+
+  // Búsqueda dinámica de clientes por nombre o documento
+  Future<List<Cliente>> searchClientes(String query) async {
+    try {
+      if (query.isEmpty) {
+        print('⚠️ Búsqueda de clientes: query vacío');
+        return [];
+      }
+
+      final encodedQuery = Uri.encodeComponent(query);
+      final url = '$baseUrl/Clientes?buscar=$encodedQuery&pagina=1';
+      
+      print('🔍 Buscando clientes en: $url');
+      
+      final response = await http
+          .get(Uri.parse(url), headers: _headers)
+          .timeout(timeoutDuration);
+
+      print('📊 Status de respuesta clientes: ${response.statusCode}');
+      print('📄 Body (primeros 200 chars): ${response.body.substring(0, min(200, response.body.length))}');
+
+      if (response.statusCode == 200) {
+        final clientes = _parseClienteList(response.body);
+        print('✅ Clientes encontrados: ${clientes.length}');
+        return clientes;
+      } else {
+        print('❌ Error en búsqueda de clientes: ${response.statusCode}');
+        print('📝 Respuesta: ${response.body}');
+        return [];
+      }
+    } catch (e) {
+      print('❌ Excepción en búsqueda de clientes: $e');
+      return [];
+    }
+  }
+
+  // Búsqueda dinámica de empleados por nombre o documento
+  Future<List<Empleado>> searchEmpleados(String query) async {
+    try {
+      if (query.isEmpty) {
+        print('⚠️ Búsqueda de empleados: query vacío');
+        return [];
+      }
+
+      final encodedQuery = Uri.encodeComponent(query);
+      final url = '$baseUrl/Empleados?buscar=$encodedQuery&pagina=1';
+      
+      print('🔍 Buscando empleados en: $url');
+      
+      final response = await http
+          .get(Uri.parse(url), headers: _headers)
+          .timeout(timeoutDuration);
+
+      print('📊 Status de respuesta empleados: ${response.statusCode}');
+      print('📄 Body (primeros 200 chars): ${response.body.substring(0, min(200, response.body.length))}');
+
+      if (response.statusCode == 200) {
+        final empleados = _parseEmpleadoList(response.body);
+        print('✅ Empleados encontrados: ${empleados.length}');
+        return empleados;
+      } else {
+        print('❌ Error en búsqueda de empleados: ${response.statusCode}');
+        print('📝 Respuesta: ${response.body}');
+        return [];
+      }
+    } catch (e) {
+      print('❌ Excepción en búsqueda de empleados: $e');
+      return [];
+    }
+  }
+
+  // Búsqueda dinámica de servicios
+  Future<List<Servicio>> searchServicios(String query) async {
+    try {
+      if (query.isEmpty) {
+        return [];
+      }
+
+      final result = await getServicios(pagina: 1, busqueda: query);
+      final servicios = result['servicios'] as List<Servicio>;
+      print('✅ Servicios encontrados: ${servicios.length}');
+      return servicios;
+    } catch (e) {
+      print('❌ Excepción en búsqueda de servicios: $e');
       return [];
     }
   }

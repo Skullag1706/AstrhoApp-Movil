@@ -3,6 +3,7 @@ import '../models/agenda.dart';
 import 'package:astrhoapp/core/services/api_service.dart';
 import 'package:astrhoapp/core/utils/colors.dart';
 import 'package:astrhoapp/core/widgets/app_bottom_nav.dart';
+import 'package:astrhoapp/core/widgets/custom_alert.dart';
 import 'appointment_flow_screen.dart';
 import 'agenda_detail_screen.dart';
 import 'package:intl/intl.dart';
@@ -41,6 +42,7 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
   int _totalHistoryPages = 1;
   final int _citasPerPage = 5;
   Map<dynamic, dynamic>? user;
+  List<Servicio> _serviciosCatalog = [];
 
   @override
   void initState() {
@@ -48,6 +50,7 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
     user = widget.user;
     final token = widget.token ?? user?['token']?.toString();
     _apiService = ApiService(token: token);
+    _loadServiciosCatalog();
     _loadAgendas();
   }
 
@@ -60,35 +63,53 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const SizedBox(width: 48),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: AppColors.white,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.auto_awesome,
-                    color: AppColors.primaryPurple,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  "AstrhoApp",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.white,
-                  ),
-                ),
-              ],
+            const Text(
+              "AstrhoApp",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.white,
+              ),
             ),
-            const SizedBox(width: 48),
+            IconButton(
+              icon: const Icon(Icons.logout, color: AppColors.white),
+              onPressed: _showLogoutDialog,
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Cerrar Sesión'),
+          content: const Text('¿Estás seguro de que deseas cerrar sesión?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/login',
+                  (route) => false,
+                );
+              },
+              child: const Text(
+                'Cerrar Sesión',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -106,7 +127,7 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
               padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
                 color: _selectedTab == 'Próximas'
-                    ? const Color(0xFF7926F7)
+                    ? AppColors.primaryPurple
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -137,7 +158,7 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
               padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
                 color: _selectedTab == 'Historial'
-                    ? const Color(0xFF7926F7)
+                    ? AppColors.primaryPurple
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -178,7 +199,7 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
                 width: 60,
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEAD8FF),
+                  color: AppColors.lightPurpleBackground,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Column(
@@ -186,7 +207,7 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
                     Text(
                       'MAY',
                       style: TextStyle(
-                        color: Color(0xFF7926F7),
+                        color: AppColors.primaryPurple,
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                       ),
@@ -223,37 +244,38 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEAD8FF),
+                            color: AppColors.lightPurpleBackground,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
                             agenda.horaInicio.substring(0, 5),
                             style: const TextStyle(
-                              color: Color(0xFF7926F7),
+                              color: AppColors.primaryPurple,
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFCE8FF),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            'Próxima cita',
-                            style: const TextStyle(
-                              color: Color(0xFFE54BCF),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                        if (_selectedTab == 'Próximas')
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.lightPink,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Próxima cita',
+                              style: TextStyle(
+                                color: AppColors.primaryPink,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
-                        ),
                       ],
                     ),
                   ],
@@ -266,8 +288,8 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
             children: [
               const CircleAvatar(
                 radius: 20,
-                backgroundColor: Color(0xFFEAD8FF),
-                child: Icon(Icons.person, color: Color(0xFF7926F7), size: 20),
+                backgroundColor: AppColors.lightPurpleBackground,
+                child: Icon(Icons.person, color: AppColors.primaryPurple, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -331,7 +353,7 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
               Text(
                 _formatCurrency(_calculateTotal(agenda)),
                 style: const TextStyle(
-                  color: Color(0xFF7926F7),
+                  color: AppColors.primaryPurple,
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
@@ -344,7 +366,7 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
             height: 48,
             child: OutlinedButton(
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFF7926F7)),
+                side: const BorderSide(color: AppColors.primaryPurple),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -355,7 +377,7 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
               child: const Text(
                 'Ver detalles',
                 style: TextStyle(
-                  color: Color(0xFF7926F7),
+                  color: AppColors.primaryPurple,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
@@ -371,7 +393,45 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
     if (agenda.servicios == null || agenda.servicios!.isEmpty) {
       return 0;
     }
-    return agenda.servicios!.fold(0.0, (sum, s) => sum + s.precio);
+    return agenda.servicios!.fold(0.0, (sum, s) => sum + _getRealPrice(s));
+  }
+
+  double _getRealPrice(Servicio servicioAgenda) {
+    if (servicioAgenda.precio > 0) return servicioAgenda.precio;
+
+    if (_serviciosCatalog.isNotEmpty) {
+      try {
+        final servicioFull = _serviciosCatalog.firstWhere(
+          (s) => s.servicioId == servicioAgenda.servicioId,
+        );
+        return servicioFull.precio;
+      } catch (e) {
+        try {
+          final servicioFull = _serviciosCatalog.firstWhere(
+            (s) =>
+                s.nombre.toLowerCase().trim() ==
+                servicioAgenda.nombre.toLowerCase().trim(),
+          );
+          return servicioFull.precio;
+        } catch (e) {
+          return 0;
+        }
+      }
+    }
+    return 0;
+  }
+
+  Future<void> _loadServiciosCatalog() async {
+    try {
+      final servicios = await _apiService!.getServiciosLegacy();
+      if (mounted) {
+        setState(() {
+          _serviciosCatalog = servicios;
+        });
+      }
+    } catch (e) {
+      print('Error al cargar servicios: $e');
+    }
   }
 
   String _formatCurrency(double amount) {
@@ -389,20 +449,30 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
     });
 
     try {
+      // Ensure servicios catalog is loaded first
+      if (_serviciosCatalog.isEmpty) {
+        await _loadServiciosCatalog();
+      }
+
       final rol = user != null ? user!["rol"]?.toString().toLowerCase() : "";
       final agendas = rol == 'cliente'
           ? await _apiService!.getMisCitas()
           : await _apiService!.getAgendas();
 
+      // Load servicios for each agenda
+      final agendasWithServicios = await Future.wait(
+        agendas.map((agenda) => _loadServiciosForAgenda(agenda)),
+      );
+
       if (mounted) {
-        final activeList = agendas.where((a) {
+        final activeList = agendasWithServicios.where((a) {
           final estado = a.nombreEstado?.toLowerCase() ?? '';
           return estado.contains('pendiente') ||
               estado.contains('confirmado') ||
               estado.contains('confirmada');
         }).toList();
         
-        final historyList = agendas.where((a) {
+        final historyList = agendasWithServicios.where((a) {
           final estado = a.nombreEstado?.toLowerCase() ?? '';
           return !estado.contains('pendiente') &&
               !estado.contains('confirmado') &&
@@ -443,13 +513,80 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
           _historyCount = 0;
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        CustomAlert.showError(context, 'Error: $e');
       }
+    }
+  }
+
+  Future<Agenda> _loadServiciosForAgenda(Agenda agenda) async {
+    try {
+      if (agenda.agendaId != null) {
+        final agendaWithServicios = await _apiService!.getAgendaById(agenda.agendaId!);
+        
+        // Enrich servicios with prices from catalog
+        if (agendaWithServicios.servicios != null && agendaWithServicios.servicios!.isNotEmpty) {
+          final enrichedServicios = agendaWithServicios.servicios!.map((s) {
+            if (s.precio > 0) return s;
+            
+            // Try to find the service in the catalog
+            try {
+              final catalogService = _serviciosCatalog.firstWhere(
+                (cs) => cs.servicioId == s.servicioId,
+              );
+              return Servicio(
+                servicioId: s.servicioId,
+                nombre: s.nombre,
+                descripcion: s.descripcion,
+                precio: catalogService.precio,
+                duracion: s.duracion,
+                estado: s.estado,
+                imagen: s.imagen,
+              );
+            } catch (e) {
+              // Try by name
+              try {
+                final catalogService = _serviciosCatalog.firstWhere(
+                  (cs) => cs.nombre.toLowerCase().trim() == s.nombre.toLowerCase().trim(),
+                );
+                return Servicio(
+                  servicioId: s.servicioId,
+                  nombre: s.nombre,
+                  descripcion: s.descripcion,
+                  precio: catalogService.precio,
+                  duracion: s.duracion,
+                  estado: s.estado,
+                  imagen: s.imagen,
+                );
+              } catch (e) {
+                return s;
+              }
+            }
+          }).toList();
+          
+          return Agenda(
+            agendaId: agendaWithServicios.agendaId,
+            documentoCliente: agendaWithServicios.documentoCliente,
+            documentoEmpleado: agendaWithServicios.documentoEmpleado,
+            ventaId: agendaWithServicios.ventaId,
+            fechaCita: agendaWithServicios.fechaCita,
+            horaInicio: agendaWithServicios.horaInicio,
+            estadoId: agendaWithServicios.estadoId,
+            metodopagoId: agendaWithServicios.metodopagoId,
+            observaciones: agendaWithServicios.observaciones,
+            nombreCliente: agendaWithServicios.nombreCliente,
+            nombreEmpleado: agendaWithServicios.nombreEmpleado,
+            nombreEstado: agendaWithServicios.nombreEstado,
+            nombreMetodoPago: agendaWithServicios.nombreMetodoPago,
+            servicios: enrichedServicios,
+          );
+        }
+        
+        return agendaWithServicios;
+      }
+      return agenda;
+    } catch (e) {
+      print('Error cargando servicios para agenda ${agenda.agendaId}: $e');
+      return agenda;
     }
   }
 
@@ -647,10 +784,10 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF7926F7) : Colors.transparent,
+          color: isActive ? AppColors.primaryPurple : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: isActive
-              ? Border.all(color: const Color(0xFF7926F7), width: 2)
+              ? Border.all(color: AppColors.primaryPurple, width: 2)
               : Border.all(color: Colors.grey[300]!, width: 1),
         ),
         alignment: Alignment.center,
@@ -669,7 +806,7 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F3FA),
+      backgroundColor: AppColors.scaffoldBackground,
       body: Column(
         children: [
           _topBar(),
@@ -759,7 +896,7 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _navigateToForm,
-        backgroundColor: const Color(0xFF7926F7),
+        backgroundColor: AppColors.primaryPurple,
         child: const Icon(Icons.add, color: Colors.white),
       ),
       bottomNavigationBar: widget.showBottomNav ? AppBottomNav(

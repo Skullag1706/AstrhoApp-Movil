@@ -61,7 +61,11 @@ class MyApp extends StatelessWidget {
         '/': (_) => LoginPage(),
         '/login': (_) => LoginPage(),
         '/register': (_) => RegisterPage(),
-        '/forgot-password': (_) => ForgotPasswordPage(),
+        '/forgot-password': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          final initialEmail = args?['email'] as String?;
+          return ForgotPasswordPage(initialEmail: initialEmail);
+        },
         '/confirm-code': (_) => ConfirmCodePage(),
         '/reset-password': (_) => ResetPasswordPage(),
 

@@ -5,6 +5,8 @@ import '../models/agenda.dart';
 import 'package:astrhoapp/core/services/api_service.dart';
 import 'package:astrhoapp/core/utils/colors.dart';
 import 'package:astrhoapp/shared/widgets/app_header.dart';
+import '../widgets/paginated_dynamic_search.dart';
+import '../widgets/searchable_service_list.dart';
 
 class AgendaFormScreen extends StatefulWidget {
   final Agenda? agenda;
@@ -735,48 +737,59 @@ class _AgendaFormScreenState extends State<AgendaFormScreen> {
                                           ],
                                         ),
                                       )
-                                    : DropdownButtonFormField<String>(
-                                        initialValue:
-                                            _selectedCliente != null &&
-                                                _clientes.any(
-                                                  (c) =>
-                                                      c.documentoCliente ==
-                                                      _selectedCliente,
-                                                )
-                                            ? _selectedCliente
-                                            : null,
-                                        decoration: InputDecoration(
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                          contentPadding:
-                                              const EdgeInsets.symmetric(
-                                                horizontal: 16,
-                                                vertical: 12,
-                                              ),
-                                        ),
-                                        hint: const Text(
-                                          'Selecciona un cliente',
-                                        ),
-                                        items: _clientes.map((cliente) {
-                                          return DropdownMenuItem(
-                                            value: cliente.documentoCliente,
-                                            child: Text(cliente.nombre),
-                                          );
-                                        }).toList(),
-                                        onChanged: (value) {
+                                    : PaginatedDynamicSearch<Cliente>(
+                                        hintText: 'Buscar cliente por nombre o documento...',
+                                        searchHintText: 'Buscar cliente...',
+                                        onSearch: (query) => _apiService.searchClientes(query),
+                                        onSelected: (cliente) {
                                           setState(() {
-                                            _selectedCliente = value;
+                                            _selectedCliente = cliente.documentoCliente;
                                           });
                                         },
-                                        validator: (value) {
-                                          if (value == null || value.isEmpty) {
-                                            return 'Selecciona un cliente';
-                                          }
-                                          return null;
-                                        },
+                                        getLabel: (cliente) => cliente.nombre,
+                                        getSubtitle: (cliente) => cliente.documentoCliente,
+                                        itemBuilder: (cliente) => Row(
+                                          children: [
+                                            Container(
+                                              width: 48,
+                                              height: 48,
+                                              decoration: BoxDecoration(
+                                                color: Colors.purple.shade100,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: const Icon(
+                                                Icons.person,
+                                                color: Color(0xFF7926F7),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    cliente.nombre,
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      fontSize: 14,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    cliente.documentoCliente,
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.grey[600],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        itemsPerPage: 5,
                                       ),
                               ),
                               const SizedBox(height: 16),
@@ -864,48 +877,59 @@ class _AgendaFormScreenState extends State<AgendaFormScreen> {
                                           ],
                                         ),
                                       )
-                                    : DropdownButtonFormField<String>(
-                                        initialValue:
-                                            _selectedEmpleado != null &&
-                                                _empleados.any(
-                                                  (e) =>
-                                                      e.documentoEmpleado ==
-                                                      _selectedEmpleado,
-                                                )
-                                            ? _selectedEmpleado
-                                            : null,
-                                        decoration: InputDecoration(
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                          contentPadding:
-                                              const EdgeInsets.symmetric(
-                                                horizontal: 16,
-                                                vertical: 12,
-                                              ),
-                                        ),
-                                        hint: const Text(
-                                          'Selecciona un empleado',
-                                        ),
-                                        items: _empleados.map((empleado) {
-                                          return DropdownMenuItem(
-                                            value: empleado.documentoEmpleado,
-                                            child: Text(empleado.nombre),
-                                          );
-                                        }).toList(),
-                                        onChanged: (value) {
+                                    : PaginatedDynamicSearch<Empleado>(
+                                        hintText: 'Buscar profesional por nombre o documento...',
+                                        searchHintText: 'Buscar profesional...',
+                                        onSearch: (query) => _apiService.searchEmpleados(query),
+                                        onSelected: (empleado) {
                                           setState(() {
-                                            _selectedEmpleado = value;
+                                            _selectedEmpleado = empleado.documentoEmpleado;
                                           });
                                         },
-                                        validator: (value) {
-                                          if (value == null || value.isEmpty) {
-                                            return 'Selecciona un empleado';
-                                          }
-                                          return null;
-                                        },
+                                        getLabel: (empleado) => empleado.nombre,
+                                        getSubtitle: (empleado) => empleado.documentoEmpleado,
+                                        itemBuilder: (empleado) => Row(
+                                          children: [
+                                            Container(
+                                              width: 48,
+                                              height: 48,
+                                              decoration: BoxDecoration(
+                                                color: Colors.purple.shade100,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: const Icon(
+                                                Icons.person,
+                                                color: Color(0xFF7926F7),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    empleado.nombre,
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      fontSize: 14,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    empleado.documentoEmpleado,
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.grey[600],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        itemsPerPage: 5,
                                       ),
                               ),
                               const SizedBox(height: 16),
@@ -949,55 +973,15 @@ class _AgendaFormScreenState extends State<AgendaFormScreen> {
                                           ],
                                         ),
                                       )
-                                    : Wrap(
-                                        spacing: 8,
-                                        runSpacing: 8,
-                                        children: _serviciosDisponibles
-                                            .map(
-                                              (servicio) => FilterChip(
-                                                label: Text(
-                                                  '${servicio.nombre} (${_formatCurrency(servicio.precio)})',
-                                                ),
-                                                selected:
-                                                    _serviciosSeleccionados
-                                                        .contains(
-                                                          servicio.servicioId,
-                                                        ),
-                                                onSelected: (selected) {
-                                                  setState(() {
-                                                    if (selected) {
-                                                      _serviciosSeleccionados
-                                                          .add(
-                                                            servicio.servicioId,
-                                                          );
-                                                    } else {
-                                                      _serviciosSeleccionados
-                                                          .remove(
-                                                            servicio.servicioId,
-                                                          );
-                                                    }
-                                                  });
-                                                },
-                                                selectedColor: AppColors
-                                                    .primaryPink
-                                                    .withOpacity(0.25),
-                                                checkmarkColor:
-                                                    AppColors.primaryPink,
-                                                backgroundColor:
-                                                    AppColors.white,
-                                                side: BorderSide(
-                                                  color:
-                                                      _serviciosSeleccionados
-                                                          .contains(
-                                                            servicio.servicioId,
-                                                          )
-                                                      ? AppColors.primaryPink
-                                                      : AppColors.textGray
-                                                            .withOpacity(0.3),
-                                                ),
-                                              ),
-                                            )
-                                            .toList(),
+                                    : SearchableServiceList(
+                                        servicios: _serviciosDisponibles,
+                                        selectedServiceIds: _serviciosSeleccionados,
+                                        onSelectionChanged: (newSelection) {
+                                          setState(() {
+                                            _serviciosSeleccionados = newSelection;
+                                          });
+                                        },
+                                        formatCurrency: _formatCurrency,
                                       ),
                               ),
                               const SizedBox(height: 12),

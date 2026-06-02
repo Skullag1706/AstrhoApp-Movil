@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../agenda/models/agenda.dart';
 import 'package:astrhoapp/core/utils/colors.dart';
+import 'package:astrhoapp/core/widgets/custom_alert.dart';
 
 class ProfilePage extends StatefulWidget {
   final Map<dynamic, dynamic> user;
@@ -21,6 +22,7 @@ class _ProfilePageState extends State<ProfilePage> {
   Map<String, dynamic>? usuarioData;
   Cliente? clienteData;
   Empleado? empleadoData;
+  String? userEmail; // Email del usuario actual
   
   // Token de autenticación
   String? get _authToken => widget.user['token']?.toString();
@@ -156,6 +158,7 @@ class _ProfilePageState extends State<ProfilePage> {
       
       // Obtener email desde widget.user si está disponible
       final widgetEmail = widget.user['email']?.toString();
+      userEmail = widgetEmail; // Guardar en variable de clase
       print('Email desde widget.user: $widgetEmail');
       
       // 1. Primero cargar datos de Cliente o Empleado (todos los registros)
@@ -195,6 +198,7 @@ class _ProfilePageState extends State<ProfilePage> {
           _documentoController.text = clienteData!.documentoCliente;
         }
       } else if (rol == 'empleado' ||
+          rol == 'asistente' ||
           rol == 'administrador' ||
           rol == 'super admin' ||
           rol == 'superadmin' ||
@@ -205,21 +209,61 @@ class _ProfilePageState extends State<ProfilePage> {
         
         // Convertir JSON a objetos Empleado
         final empleados = empleadosJson.map((json) => Empleado.fromJson(json)).toList();
+        print('Empleados convertidos: ${empleados.length}');
         
-        empleadoData = empleados.firstWhere(
-          (e) {
-            print('Empleado: usuarioId=${e.usuarioId}, documento=${e.documentoEmpleado}, email=${e.email}');
-            // Coincidir por email primero
-            final matchByEmail = widgetEmail != null && e.email?.toLowerCase() == widgetEmail.toLowerCase();
-            final matchById = usuarioId != null && e.usuarioId == usuarioId;
-            return matchByEmail || matchById;
-          },
-          orElse: () => Empleado(documentoEmpleado: '', nombre: ''),
-        );
+        // Imprimir todos los empleados para depuración
+        for (int i = 0; i < empleados.length; i++) {
+          final e = empleados[i];
+          print('  Empleado $i: usuarioId=${e.usuarioId}, documento=${e.documentoEmpleado}, email=${e.email}, nombre=${e.nombre}, dirección=${e.direccion}');
+        }
         
-        print('empleadoData: $empleadoData');
+        // Buscar el empleado actual
+        Empleado? foundEmpleado;
         
-        if (empleadoData != null && empleadoData!.documentoEmpleado.isNotEmpty) {
+        // Primero intentar por email
+        if (widgetEmail != null && widgetEmail.isNotEmpty) {
+          print('Buscando por email: $widgetEmail');
+          try {
+            foundEmpleado = empleados.firstWhere(
+              (e) => e.email?.toLowerCase() == widgetEmail.toLowerCase(),
+            );
+            print('✅ Empleado encontrado por email');
+          } catch (_) {
+            print('❌ No encontrado por email');
+          }
+        }
+        
+        // Si no encontró por email, intentar por usuarioId
+        if (foundEmpleado == null && usuarioId != null) {
+          print('Buscando por usuarioId: $usuarioId');
+          try {
+            foundEmpleado = empleados.firstWhere(
+              (e) => e.usuarioId == usuarioId,
+            );
+            print('✅ Empleado encontrado por usuarioId');
+          } catch (_) {
+            print('❌ No encontrado por usuarioId');
+          }
+        }
+        
+        // Si aún no encontró, intentar por documento
+        if (foundEmpleado == null && widgetEmail != null) {
+          print('Buscando por documento (usando email como fallback)...');
+          try {
+            foundEmpleado = empleados.firstWhere(
+              (e) => e.documentoEmpleado.isNotEmpty,
+            );
+            print('✅ Empleado encontrado (primer disponible)');
+          } catch (_) {
+            print('❌ No hay empleados disponibles');
+          }
+        }
+        
+        if (foundEmpleado != null) {
+          empleadoData = foundEmpleado;
+          print('empleadoData asignado: ${empleadoData!.nombre}');
+          print('empleadoData dirección: ${empleadoData!.direccion}');
+          
           usuarioIdDesdePerfil = empleadoData!.usuarioId;
           print('usuarioId desde Empleado: $usuarioIdDesdePerfil');
           
@@ -227,6 +271,14 @@ class _ProfilePageState extends State<ProfilePage> {
           _telefonoController.text = empleadoData!.telefono ?? '';
           _direccionController.text = empleadoData!.direccion ?? '';
           _documentoController.text = empleadoData!.documentoEmpleado;
+          
+          print('Valores cargados:');
+          print('  - Nombre: ${_nombreController.text}');
+          print('  - Teléfono: ${_telefonoController.text}');
+          print('  - Dirección: ${_direccionController.text}');
+          print('  - Documento: ${_documentoController.text}');
+        } else {
+          print('⚠️ No se encontró empleado con los criterios disponibles');
         }
       }
       
@@ -284,12 +336,7 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _saveProfile() async {
     if (_nombreController.text.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('El nombre es obligatorio'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        CustomAlert.showError(context, 'El nombre es obligatorio');
       }
       return;
     }
@@ -355,12 +402,7 @@ class _ProfilePageState extends State<ProfilePage> {
       }
 
       if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Perfil actualizado correctamente'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        CustomAlert.showSuccess(context, 'Perfil actualizado correctamente');
         await _loadProfileData();
         setState(() {
           isEditing = false;
@@ -369,12 +411,7 @@ class _ProfilePageState extends State<ProfilePage> {
     } catch (e) {
       print('Error al guardar perfil: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al guardar: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        CustomAlert.showError(context, 'Error al guardar: $e');
       }
     } finally {
       if (mounted) {
@@ -393,7 +430,10 @@ class _ProfilePageState extends State<ProfilePage> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const SizedBox(width: 48),
+            IconButton(
+              icon: const Icon(Icons.logout, color: AppColors.white),
+              onPressed: _showLogoutDialog,
+            ),
             Row(
               children: [
                 const Icon(Icons.auto_awesome, color: AppColors.white, size: 24),
@@ -425,6 +465,25 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
       ),
     );
+  }
+
+  void _showLogoutDialog() {
+    CustomAlert.showConfirmDialog(
+      context,
+      title: 'Cerrar Sesión',
+      message: '¿Estás seguro de que deseas cerrar sesión?',
+      confirmText: 'Cerrar Sesión',
+      cancelText: 'Cancelar',
+      isDangerous: true,
+    ).then((confirmed) {
+      if (confirmed == true) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/login',
+          (route) => false,
+        );
+      }
+    });
   }
 
   @override
@@ -518,7 +577,11 @@ class _ProfilePageState extends State<ProfilePage> {
                                 elevation: 0,
                               ),
                               onPressed: () {
-                                Navigator.pushNamed(context, '/forgot-password');
+                                Navigator.pushNamed(
+                                  context,
+                                  '/forgot-password',
+                                  arguments: {'email': userEmail},
+                                );
                               },
                               icon: const Icon(Icons.lock_outline, color: AppColors.white),
                               label: const Text(

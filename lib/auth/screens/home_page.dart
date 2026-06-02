@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:astrhoapp/core/utils/colors.dart';
+import 'package:astrhoapp/core/widgets/custom_alert.dart';
 import 'package:astrhoapp/agenda/screens/appointment_flow_screen.dart';
 import 'package:astrhoapp/agenda/screens/mis_citas_screen.dart';
 // SERVICES
@@ -181,35 +182,22 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _showLogoutDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Cerrar Sesión'),
-          content: const Text('¿Estás seguro de que deseas cerrar sesión?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.pushNamedAndRemoveUntil(
-                  context,
-                  '/login',
-                  (route) => false,
-                );
-              },
-              child: const Text(
-                'Cerrar Sesión',
-                style: TextStyle(color: Colors.red),
-              ),
-            ),
-          ],
+    CustomAlert.showConfirmDialog(
+      context,
+      title: 'Cerrar Sesión',
+      message: '¿Estás seguro de que deseas cerrar sesión?',
+      confirmText: 'Cerrar Sesión',
+      cancelText: 'Cancelar',
+      isDangerous: true,
+    ).then((confirmed) {
+      if (confirmed == true) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/login',
+          (route) => false,
         );
-      },
-    );
+      }
+    });
   }
 
   Widget _bottomNav() {

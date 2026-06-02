@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:astrhoapp/core/utils/colors.dart';
+import 'package:astrhoapp/core/widgets/custom_alert.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -19,9 +20,7 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> login() async {
     if (userCtrl.text.isEmpty || passCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Ingresa usuario y contraseña")));
+      CustomAlert.showError(context, "Ingresa usuario y contraseña");
       return;
     }
 
@@ -76,17 +75,13 @@ class _LoginPageState extends State<LoginPage> {
         print(
           'DEBUG Login: Credenciales inválidas - Status: ${response.statusCode}',
         );
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Credenciales inválidas")));
+        CustomAlert.showError(context, "Credenciales inválidas");
       }
     } catch (e, stackTrace) {
       print('DEBUG Login: ERROR CAPTURADO: $e');
       print('DEBUG Login: Stack trace: $stackTrace');
       setState(() => loading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Error de conexión: $e")));
+      CustomAlert.showError(context, "Error de conexión: $e");
     }
   }
 

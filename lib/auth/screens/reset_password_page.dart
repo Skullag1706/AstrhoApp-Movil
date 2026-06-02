@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:astrhoapp/core/services/auth_service.dart';
 import 'package:astrhoapp/core/utils/colors.dart';
+import 'package:astrhoapp/core/widgets/custom_alert.dart';
 
 class ResetPasswordPage extends StatefulWidget {
   const ResetPasswordPage({super.key});
@@ -59,12 +60,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     if (resetToken == null) {
       setState(() => loading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Token no encontrado"),
-            backgroundColor: Colors.red,
-          ),
-        );
+        CustomAlert.showError(context, "Token no encontrado");
       }
       return;
     }
@@ -80,33 +76,18 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
       if (success) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Contraseña cambiada exitosamente"),
-              backgroundColor: Colors.green,
-            ),
-          );
+          CustomAlert.showSuccess(context, "Contraseña cambiada exitosamente");
           Navigator.pushReplacementNamed(context, '/');
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Error al cambiar contraseña"),
-              backgroundColor: Colors.red,
-            ),
-          );
+          CustomAlert.showError(context, "Error al cambiar contraseña");
         }
       }
     } catch (e) {
       setState(() => loading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error de conexión: $e"),
-            backgroundColor: Colors.red,
-          ),
-        );
+        CustomAlert.showError(context, "Error de conexión: $e");
       }
     }
   }
