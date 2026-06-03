@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:astrhoapp/core/utils/colors.dart';
 import 'package:astrhoapp/core/widgets/custom_alert.dart';
+import 'package:astrhoapp/core/services/registration_service.dart';
+import 'dart:developer' as developer;
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -111,27 +111,20 @@ class _RegisterPageState extends State<RegisterPage> {
       setState(() => emailExistsError = null);
       return;
     }
-    final checkUrl = Uri.parse("http://www.astrhoapp.somee.com/api/Usuarios");
     try {
-      final checkResponse = await http.get(checkUrl);
-      if (checkResponse.statusCode == 200) {
-        List<dynamic> users = jsonDecode(checkResponse.body);
-        bool emailExists = users.any(
-          (u) =>
-              u["email"].toString().toLowerCase() == value.trim().toLowerCase(),
-        );
-        setState(
-          () => emailExistsError = emailExists ? "Correo ya registrado" : null,
-        );
-      } else {
-        setState(() => emailExistsError = null);
-      }
+      bool exists = await RegistrationService.checkEmailExists(value);
+      setState(
+        () => emailExistsError = exists ? "Correo ya registrado" : null,
+      );
     } catch (e) {
+      developer.log('⚠️ Error al verificar email: $e');
       setState(() => emailExistsError = null);
     }
   }
 
   Future<void> registerUser() async {
+    developer.log('🔵 INICIO DE REGISTRO DE USUARIO');
+    
     setState(() {
       emailError = validateEmail(emailController.text);
       confirmEmailError = validateConfirmEmail(confirmEmailController.text);
@@ -144,6 +137,8 @@ class _RegisterPageState extends State<RegisterPage> {
       direccionError = validateDireccion(direccionCtrl.text);
     });
 
+    developer.log('📋 Validación de campos completada');
+
     if (emailError != null ||
         confirmEmailError != null ||
         passError != null ||
@@ -153,108 +148,110 @@ class _RegisterPageState extends State<RegisterPage> {
         telefonoError != null ||
         tipoDocumentoError != null ||
         direccionError != null) {
+      developer.log('❌ Validación fallida: hay errores en los campos');
       showError("Corrige los errores antes de continuar");
       return;
     }
 
+    developer.log('✅ Todos los campos son válidos');
     setState(() => isLoading = true);
 
-    final checkUrl = Uri.parse("http://www.astrhoapp.somee.com/api/Usuarios");
     try {
-      final checkResponse = await http.get(checkUrl);
-      if (checkResponse.statusCode == 200) {
-        List<dynamic> users = jsonDecode(checkResponse.body);
-        bool emailExists = users.any(
-          (u) =>
-              u["email"].toString().toLowerCase() ==
-              emailController.text.trim().toLowerCase(),
-        );
-
-        if (emailExists) {
-          showError("El correo ya está registrado");
-          return;
-        }
-      } else {
-        showError("Error al verificar datos existentes");
-        return;
-      }
-    } catch (e) {
-      setState(() => isLoading = false);
-      showError("Error de conexión: $e");
-      return;
-    }
-
-    final url = Uri.parse("http://www.astrhoapp.somee.com/api/Usuarios");
-
-    final body = {
-      "rolId": 2,
-      "nombreUsuario": emailController.text.split('@')[0],
-      "email": emailController.text.trim(),
-      "contrasena": passController.text.trim(),
-      "confirmarContrasena": confirmPassController.text.trim(),
-    };
-
-    try {
-      final response = await http.post(
-        url,
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode(body),
+      // 1️⃣ Verificar que el email no exista
+      developer.log('🔄 PASO 1: Verificando si el email ya existe...');
+      bool emailExists = await RegistrationService.checkEmailExists(
+        emailController.text,
       );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        int? newUserId;
-        try {
-          final getRes = await http.get(Uri.parse("http://www.astrhoapp.somee.com/api/Usuarios"));
-          if (getRes.statusCode == 200) {
-            List<dynamic> users = jsonDecode(getRes.body);
-            var createdUser = users.firstWhere(
-              (u) => u["email"].toString().toLowerCase() == emailController.text.trim().toLowerCase(),
-              orElse: () => null,
-            );
-            if (createdUser != null) {
-              newUserId = createdUser["idUsuario"] ?? createdUser["usuarioId"];
-            }
-          }
-        } catch (e) {
-          print("Error obtaining new user ID: $e");
-        }
-
-        if (newUserId != null) {
-          final clientData = {
-            "documentoCliente": documentoCtrl.text,
-            "usuarioId": newUserId,
-            "tipoDocumento": tipoDocumento,
-            "nombre": nombreCtrl.text,
-            "telefono": telefonoCtrl.text,
-            "direccion": direccionCtrl.text,
-            "estado": true,
-          };
-          
-          final clientRes = await http.post(
-            Uri.parse("http://www.astrhoapp.somee.com/api/Clientes"),
-            headers: {"Content-Type": "application/json"},
-            body: jsonEncode(clientData),
-          );
-
-          setState(() => isLoading = false);
-
-          if (clientRes.statusCode == 200 || clientRes.statusCode == 201) {
-            showSuccess("Usuario creado exitosamente");
-            if (mounted) Navigator.pop(context);
-          } else {
-            showError("Usuario creado, pero hubo un error al guardar datos de cliente");
-          }
-        } else {
-          setState(() => isLoading = false);
-          showError("Usuario creado, pero no se pudo obtener su ID");
-        }
-      } else {
+      if (emailExists) {
+        developer.log('⚠️ Email ya registrado');
         setState(() => isLoading = false);
-        showError("Error: ${response.body}");
+        showError("El correo ya está registrado");
+        return;
+      }
+
+      developer.log('✅ Email disponible');
+
+      // 2️⃣ Registrar usuario
+      developer.log('🔄 PASO 2: Registrando usuario en la API...');
+      await RegistrationService.registerUser(
+        email: emailController.text.trim(),
+        password: passController.text.trim(),
+        confirmPassword: confirmPassController.text.trim(),
+      );
+
+      developer.log('✅ Usuario registrado');
+
+      // 3️⃣ Hacer login para obtener el ID
+      developer.log('🔄 PASO 3: Obteniendo ID del usuario mediante login...');
+      Map<String, dynamic>? loginData = await RegistrationService.loginAfterRegistration(
+        emailController.text.trim(),
+        passController.text.trim(),
+      );
+
+      if (loginData == null) {
+        developer.log('⚠️ No se pudo obtener datos del usuario');
+        setState(() => isLoading = false);
+        showError("Usuario creado, pero no se pudo obtener sus datos");
+        return;
+      }
+
+      developer.log('✅ Login exitoso, datos obtenidos');
+
+      // Extraer ID
+      int? userId = loginData['idUsuario'];
+      if (userId == null || userId == 0) {
+        developer.log('⚠️ No se pudo obtener el ID del usuario de los datos de login');
+        setState(() => isLoading = false);
+        showError("Usuario creado, pero no se pudo obtener su ID");
+        return;
+      }
+
+      developer.log('✅ ID del usuario: $userId');
+
+      // 4️⃣ Registrar datos del cliente
+      developer.log('🔄 PASO 4: Registrando datos del cliente...');
+      
+      // Extraer el token del login
+      String? token = loginData['token'];
+      developer.log('🔐 Token extraído: ${token != null ? token.substring(0, 20) + '...' : 'NULL'}');
+      developer.log('🔐 Token length: ${token?.length}');
+      developer.log('🔐 Token null check: ${token == null}');
+      developer.log('🔐 Token empty check: ${token?.isEmpty}');
+      
+      if (token == null || token.isEmpty) {
+        developer.log('⚠️ No se pudo obtener el token de autenticación');
+        setState(() => isLoading = false);
+        showError("Error de autenticación al registrar cliente");
+        return;
+      }
+      
+      developer.log('✅ Token obtenido para autenticación - pasando a servicio');
+      
+      bool clientRegistered = await RegistrationService.registerClientWithAuth(
+        userId: userId,
+        documento: documentoCtrl.text,
+        tipoDocumento: tipoDocumento!,
+        nombre: nombreCtrl.text,
+        telefono: telefonoCtrl.text,
+        direccion: direccionCtrl.text,
+        token: token,
+      );
+
+      setState(() => isLoading = false);
+
+      if (clientRegistered) {
+        developer.log('✅ REGISTRO COMPLETADO EXITOSAMENTE');
+        showSuccess("Usuario creado exitosamente");
+        if (mounted) Navigator.pop(context);
+      } else {
+        developer.log('❌ Error al registrar cliente');
+        showError("Error al guardar datos del cliente");
       }
     } catch (e) {
+      developer.log('🔴 ERROR: $e');
       setState(() => isLoading = false);
-      showError("Error de conexión: $e");
+      showError("Error: $e");
     }
   }
 

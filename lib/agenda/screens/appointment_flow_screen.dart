@@ -757,6 +757,17 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
     }
     print('Horario de trabajo: ${_formatTime12Hour(horarioInicio)} - ${_formatTime12Hour(horarioFin)}');
     
+    // Convertir horarioFin a la fecha real del día seleccionado para comparaciones correctas
+    final horarioFinEnFechaReal = DateTime(
+      selectedDate!.year,
+      selectedDate!.month,
+      selectedDate!.day,
+      horarioFin.hour,
+      horarioFin.minute,
+    );
+    print('Horario fin convertido a fecha real: ${_formatTime12Hour(horarioFinEnFechaReal)} (${horarioFinEnFechaReal.toString()})');
+    
+    
     // 3. CALCULAR LOS RANGOS DE LAS CITAS EXISTENTES (CON SU DURACIÓN)
     final rangosCitasExistentes = <DateTimeRange>[];
     print('--- CALCULANDO RANGOS DE CITAS EXISTENTES ---');
@@ -841,14 +852,50 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
       print('  Rango $i: ${_formatTime12Hour(r.start)} - ${_formatTime12Hour(r.end)}');
     }
     
-    // 4. Generar y evaluar todos los slots (100% MANUAL, SIN DEPENDER DE LA API)
+    // 4. CALCULAR DURACIÓN TOTAL DEL SERVICIO SELECCIONADO
+    int duracionServicioSeleccionado = 30; // Default 30 minutos
+    if (serviciosSeleccionados.isNotEmpty) {
+      duracionServicioSeleccionado = 0;
+      for (final servicioId in serviciosSeleccionados) {
+        final servicio = serviciosDisponibles.firstWhere(
+          (s) => s.servicioId == servicioId,
+          orElse: () => Servicio(
+            servicioId: servicioId,
+            nombre: 'Desconocido',
+            duracion: 30,
+            precio: 0,
+            estado: true,
+          ),
+        );
+        duracionServicioSeleccionado += servicio.duracion;
+      }
+    }
+    print('--- DURACIÓN DEL SERVICIO SELECCIONADO ---');
+    print('Duración total: $duracionServicioSeleccionado minutos');
+    
+    // 5. Generar y evaluar todos los slots (100% MANUAL, SIN DEPENDER DE LA API)
     final slots = <TimeSlot>[];
     final ahora = DateTime.now();
-    var horaActual = horarioInicio;
+    
+    // Convertir horarioInicio a la fecha real también
+    final horarioInicioEnFechaReal = DateTime(
+      selectedDate!.year,
+      selectedDate!.month,
+      selectedDate!.day,
+      horarioInicio.hour,
+      horarioInicio.minute,
+    );
+    
+    var horaActual = horarioInicioEnFechaReal;
+    int iteraciones = 0;
+    const maxIteraciones = 500; // Límite de seguridad para evitar loops infinitos
     
     print('--- EVALUANDO SLOTS (100% MANUAL) ---');
+    print('Nota: Se valida que el servicio termine antes de las ${_formatTime12Hour(horarioFinEnFechaReal)}');
+    print('Hora inicial real: ${_formatTime12Hour(horarioInicioEnFechaReal)}');
     
-    while (horaActual.isBefore(horarioFin)) {
+    while (horaActual.isBefore(horarioFinEnFechaReal) && iteraciones < maxIteraciones) {
+      iteraciones++;
       final slotDateTime = DateTime(
         selectedDate!.year,
         selectedDate!.month,
@@ -861,25 +908,32 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
       final slotHora24h = DateFormat('HH:mm:ss').format(slotDateTime);
       final slotHora24hSinSegundos = DateFormat('HH:mm').format(slotDateTime);
       final slotInicio = slotDateTime;
-      final slotFin30 = slotInicio.add(const Duration(minutes: 30));
+      final slotFinConDuracion = slotInicio.add(Duration(minutes: duracionServicioSeleccionado));
       
       TimeSlotStatus estado = TimeSlotStatus.available;
       String motivo = '';
       
       print('  - Evaluando slot: $slotHoraStr ($slotHora24h / $slotHora24hSinSegundos)');
+      print('    → Rango del slot con duración: ${_formatTime12Hour(slotInicio)} - ${_formatTime12Hour(slotFinConDuracion)}');
+      print('    → Horario fin del profesional: ${_formatTime12Hour(horarioFinEnFechaReal)}');
       
       // 1. VERIFICAR SI LA HORA YA PASÓ (PRIORIDAD 1)
       if (slotInicio.isBefore(ahora)) {
         estado = TimeSlotStatus.unavailable;
         motivo = 'hora pasada';
       }
-      // 2. VERIFICAR SI ESTÁ EN LA LISTA DE HORAS DISPONIBLES DE LA API (PRIORIDAD 2)
+      // 2. VERIFICAR SI LA CITA TERMINARÍA DESPUÉS DEL HORARIO FIN DEL PROFESIONAL (NUEVA RESTRICCIÓN)
+      else if (slotFinConDuracion.isAfter(horarioFinEnFechaReal)) {
+        estado = TimeSlotStatus.unavailable;
+        motivo = 'la cita terminaría después del horario de fin (${_formatTime12Hour(slotFinConDuracion)} > ${_formatTime12Hour(horarioFinEnFechaReal)})';
+      }
+      // 3. VERIFICAR SI ESTÁ EN LA LISTA DE HORAS DISPONIBLES DE LA API (PRIORIDAD 3)
       else if (horasDisponiblesApi.contains(slotHora24h) || horasDisponiblesApi.contains(slotHora24hSinSegundos)) {
-        // 3. Ahora chequear si se solapa con alguna cita existente (PRIORIDAD 3 - sobreescribe la disponibilidad)
+        // 4. Ahora chequear si se solapa con alguna cita existente (PRIORIDAD 4 - sobreescribe la disponibilidad)
         if (rangosCitasExistentes.any((rango) {
-          print('🔍 Evaluando solapamiento: slot $slotHoraStr ($slotInicio - $slotFin30) vs rango ${_formatTime12Hour(rango.start)} - ${_formatTime12Hour(rango.end)}');
+          print('🔍 Evaluando solapamiento: slot $slotHoraStr ($slotInicio - $slotFinConDuracion) vs rango ${_formatTime12Hour(rango.start)} - ${_formatTime12Hour(rango.end)}');
           
-          final solapa = slotInicio.isBefore(rango.end) && slotFin30.isAfter(rango.start);
+          final solapa = slotInicio.isBefore(rango.end) && slotFinConDuracion.isAfter(rango.start);
           if (solapa) {
             print('  ⛔¡SOLAPA!');
           } else {
@@ -895,7 +949,7 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
           motivo = 'disponible según API y no solapa';
         }
       }
-      // 4. SI NO ESTÁ EN LA API, ESTÁ RESERVADO
+      // 5. SI NO ESTÁ EN LA API, ESTÁ RESERVADO
       else {
         estado = TimeSlotStatus.reserved;
         motivo = 'ocupado según API';
@@ -921,6 +975,10 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
     availableTimeSlots = slots;
     print('========================================');
     print('RESUMEN FINAL:');
+    print('  - Total iteraciones: $iteraciones (máximo: $maxIteraciones)');
+    if (iteraciones >= maxIteraciones) {
+      print('  ⚠️ ADVERTENCIA: Se alcanzó el límite de iteraciones');
+    }
     print('  - Disponibles: ${slots.where((s) => s.isAvailable).length}');
     print('  - Reservados: ${slots.where((s) => s.isReserved).length}');
     print('  - No disponibles: ${slots.where((s) => s.isUnavailable).length}');
@@ -1267,6 +1325,12 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
                                     serviciosSeleccionados.remove(servicio.servicioId);
                                   } else {
                                     serviciosSeleccionados.add(servicio.servicioId);
+                                  }
+                                });
+                                // Recalcular slots en el siguiente frame después de que setState termine
+                                Future.microtask(() {
+                                  if (selectedEmpleado != null && selectedDate != null && mounted) {
+                                    _calculateAvailableSlots();
                                   }
                                 });
                               },
