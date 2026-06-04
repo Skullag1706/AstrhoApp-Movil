@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:astrhoapp/core/utils/colors.dart';
 import 'package:astrhoapp/core/widgets/custom_alert.dart';
 import 'package:astrhoapp/core/services/registration_service.dart';
@@ -322,6 +323,7 @@ class _RegisterPageState extends State<RegisterPage> {
     VoidCallback? onToggle,
     Function(String)? onChanged,
     bool isError = false,
+    int maxLength = 100,
   }) {
     Color borderColor = AppColors.borderLight;
     if (isError) {
@@ -342,6 +344,9 @@ class _RegisterPageState extends State<RegisterPage> {
             child: TextFormField(
               controller: controller,
               obscureText: isPassword ? !showPassword : false,
+              inputFormatters: [
+                LengthLimitingTextInputFormatter(maxLength),
+              ],
               decoration: InputDecoration(
                 hintText: hint,
                 hintStyle: const TextStyle(color: AppColors.textGray),
@@ -432,6 +437,7 @@ class _RegisterPageState extends State<RegisterPage> {
                               checkEmailExists(value);
                             },
                             isError: emailError != null || emailExistsError != null,
+                            maxLength: 100,
                           ),
                           const SizedBox(height: 16),
                           _buildLabel("Confirmar correo", confirmEmailError),
@@ -442,6 +448,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             hint: "Confirma tu correo",
                             onChanged: (value) => setState(() => confirmEmailError = validateConfirmEmail(value)),
                             isError: confirmEmailError != null,
+                            maxLength: 100,
                           ),
                           const SizedBox(height: 16),
                           _buildLabel("Contraseña", passError),
@@ -455,6 +462,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             onToggle: () => setState(() => showPass = !showPass),
                             onChanged: (value) => setState(() => passError = validatePass(value)),
                             isError: passError != null,
+                            maxLength: 15,
                           ),
                           const SizedBox(height: 16),
                           _buildLabel("Confirmar contraseña", confirmPassError),
@@ -468,6 +476,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             onToggle: () => setState(() => showConfirmPass = !showConfirmPass),
                             onChanged: (value) => setState(() => confirmPassError = validateConfirmPass(value)),
                             isError: confirmPassError != null,
+                            maxLength: 15,
                           ),
                           const SizedBox(height: 24),
                           const Divider(color: AppColors.borderLight),
@@ -531,6 +540,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             hint: "Ingresa tu documento",
                             onChanged: (value) => setState(() => documentoError = validateDocumento(value)),
                             isError: documentoError != null,
+                            maxLength: 15,
                           ),
                           const SizedBox(height: 16),
                           _buildLabel("Nombre", nombreClienteError),
@@ -541,6 +551,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             hint: "Ingresa tu nombre completo",
                             onChanged: (value) => setState(() => nombreClienteError = validateNombreCliente(value)),
                             isError: nombreClienteError != null,
+                            maxLength: 100,
                           ),
                           const SizedBox(height: 16),
                           _buildLabel("Teléfono", telefonoError),
@@ -551,6 +562,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             hint: "Ingresa tu teléfono",
                             onChanged: (value) => setState(() => telefonoError = validateTelefono(value)),
                             isError: telefonoError != null,
+                            maxLength: 10,
                           ),
                           const SizedBox(height: 16),
                           _buildLabel("Dirección", direccionError),
@@ -561,6 +573,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             hint: "Ingresa tu dirección",
                             onChanged: (value) => setState(() => direccionError = validateDireccion(value)),
                             isError: direccionError != null,
+                            maxLength: 100,
                           ),
                           const SizedBox(height: 28),
                           SizedBox(

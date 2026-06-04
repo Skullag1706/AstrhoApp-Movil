@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:astrhoapp/core/services/auth_service.dart';
 import 'package:astrhoapp/core/utils/colors.dart';
 import 'package:astrhoapp/core/widgets/custom_alert.dart';
@@ -223,6 +224,9 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                                 child: TextField(
                                   controller: newPassCtrl,
                                   obscureText: obscureNew,
+                                  inputFormatters: [
+                                    LengthLimitingTextInputFormatter(15),
+                                  ],
                                   decoration: InputDecoration(
                                     prefixIcon: const Icon(Icons.lock_outline, color: AppColors.textGray),
                                     suffixIcon: IconButton(
@@ -266,6 +270,9 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                                 child: TextField(
                                   controller: confirmPassCtrl,
                                   obscureText: obscureConfirm,
+                                  inputFormatters: [
+                                    LengthLimitingTextInputFormatter(15),
+                                  ],
                                   decoration: InputDecoration(
                                     prefixIcon: const Icon(Icons.lock_outline, color: AppColors.textGray),
                                     suffixIcon: IconButton(

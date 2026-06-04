@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import '../../agenda/models/agenda.dart';
 import 'package:astrhoapp/core/utils/colors.dart';
@@ -203,21 +204,16 @@ class _ProfilePageState extends State<ProfilePage> {
           rol == 'super admin' ||
           rol == 'superadmin' ||
           rol == 'super administrador') {
-        print('Cargando datos de Empleados (todas las páginas)...');
+        print('Cargando datos de Empleado (endpoint específico)...');
+        
+        // Primero cargar todos los empleados para obtener el documento
         final empleadosJson = await fetchAllPaginated('/api/Empleados');
-        print('Total empleados: ${empleadosJson.length}');
+        print('Total empleados en lista: ${empleadosJson.length}');
         
         // Convertir JSON a objetos Empleado
         final empleados = empleadosJson.map((json) => Empleado.fromJson(json)).toList();
         print('Empleados convertidos: ${empleados.length}');
         
-        // Imprimir todos los empleados para depuración
-        for (int i = 0; i < empleados.length; i++) {
-          final e = empleados[i];
-          print('  Empleado $i: usuarioId=${e.usuarioId}, documento=${e.documentoEmpleado}, email=${e.email}, nombre=${e.nombre}, dirección=${e.direccion}');
-        }
-        
-        // Buscar el empleado actual
         Empleado? foundEmpleado;
         
         // Primero intentar por email
@@ -227,7 +223,7 @@ class _ProfilePageState extends State<ProfilePage> {
             foundEmpleado = empleados.firstWhere(
               (e) => e.email?.toLowerCase() == widgetEmail.toLowerCase(),
             );
-            print('✅ Empleado encontrado por email');
+            print('✅ Empleado encontrado por email: ${foundEmpleado.documentoEmpleado}');
           } catch (_) {
             print('❌ No encontrado por email');
           }
@@ -240,29 +236,35 @@ class _ProfilePageState extends State<ProfilePage> {
             foundEmpleado = empleados.firstWhere(
               (e) => e.usuarioId == usuarioId,
             );
-            print('✅ Empleado encontrado por usuarioId');
+            print('✅ Empleado encontrado por usuarioId: ${foundEmpleado.documentoEmpleado}');
           } catch (_) {
             print('❌ No encontrado por usuarioId');
           }
         }
         
-        // Si aún no encontró, intentar por documento
-        if (foundEmpleado == null && widgetEmail != null) {
-          print('Buscando por documento (usando email como fallback)...');
-          try {
-            foundEmpleado = empleados.firstWhere(
-              (e) => e.documentoEmpleado.isNotEmpty,
-            );
-            print('✅ Empleado encontrado (primer disponible)');
-          } catch (_) {
-            print('❌ No hay empleados disponibles');
-          }
-        }
-        
+        // Si encontró el empleado, usar el endpoint específico
         if (foundEmpleado != null) {
-          empleadoData = foundEmpleado;
-          print('empleadoData asignado: ${empleadoData!.nombre}');
-          print('empleadoData dirección: ${empleadoData!.direccion}');
+          print('Usando endpoint específico: /api/Empleados/${foundEmpleado.documentoEmpleado}');
+          
+          final specificUrl = Uri.parse('http://www.astrhoapp.somee.com/api/Empleados/${foundEmpleado.documentoEmpleado}');
+          final specificResponse = await http.get(specificUrl, headers: _headers);
+          
+          print('Response status: ${specificResponse.statusCode}');
+          print('Response body: ${specificResponse.body}');
+          
+          if (specificResponse.statusCode == 200) {
+            final specificData = jsonDecode(specificResponse.body);
+            
+            // El endpoint podría devolver el objeto directamente o dentro de una propiedad
+            final empleadoJson = specificData is List ? specificData.first : specificData;
+            empleadoData = Empleado.fromJson(empleadoJson);
+            
+            print('✅ Datos del empleado cargados desde endpoint específico');
+          } else {
+            // Fallback: usar el empleado encontrado en la lista
+            empleadoData = foundEmpleado;
+            print('⚠️ Usando datos del empleado de la lista (endpoint específico falló)');
+          }
           
           usuarioIdDesdePerfil = empleadoData!.usuarioId;
           print('usuarioId desde Empleado: $usuarioIdDesdePerfil');
@@ -528,6 +530,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             controller: _emailController,
                             icon: Icons.email,
                             enabled: false,
+                            maxLength: 100,
                           ),
                           const SizedBox(height: 16),
                           _buildProfileField(
@@ -535,6 +538,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             controller: _documentoController,
                             icon: Icons.credit_card,
                             enabled: false,
+                            maxLength: 15,
                           ),
                           const SizedBox(height: 16),
                           _buildProfileField(
@@ -542,6 +546,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             controller: _nombreController,
                             icon: Icons.person_outline,
                             enabled: isEditing,
+                            maxLength: 100,
                           ),
                           const SizedBox(height: 16),
                           _buildProfileField(
@@ -549,6 +554,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             controller: _telefonoController,
                             icon: Icons.phone,
                             enabled: isEditing,
+                            maxLength: 10,
                           ),
                           const SizedBox(height: 16),
                           _buildProfileField(
@@ -556,6 +562,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             controller: _direccionController,
                             icon: Icons.location_on,
                             enabled: isEditing,
+                            maxLength: 100,
                           ),
                           const SizedBox(height: 16),
                           _buildInfoCard(
@@ -674,6 +681,7 @@ class _ProfilePageState extends State<ProfilePage> {
     required IconData icon,
     bool enabled = true,
     bool obscureText = false,
+    int maxLength = 100,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -706,6 +714,9 @@ class _ProfilePageState extends State<ProfilePage> {
                   controller: controller,
                   enabled: enabled,
                   obscureText: obscureText,
+                  inputFormatters: [
+                    LengthLimitingTextInputFormatter(maxLength),
+                  ],
                   decoration: const InputDecoration(
                     border: InputBorder.none,
                     hintText: '',
