@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/agenda.dart';
@@ -66,6 +67,9 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
   List<TimeSlot> availableTimeSlots = [];
   List<String> horasDisponiblesApi = []; // Horas que vienen de la API
   bool loadingHorarios = false;
+  
+  // Mapa de empleados que tienen horas disponibles
+  Map<String, bool> empleadosConHoras = {};
 
   // Pagination variables
   final int _itemsPerPage = 5;
@@ -100,6 +104,16 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
   int _totalEmpleadoFilteredPages = 1;
   List<Empleado> _displayedEmpleadosFiltered = [];
 
+  // Debounce timers para búsquedas
+  Timer? _servicioSearchTimer;
+  Timer? _clienteSearchTimer;
+  Timer? _empleadoSearchTimer;
+  
+  // Focus nodes para los campos de búsqueda
+  late FocusNode _servicioFocusNode;
+  late FocusNode _clienteFocusNode;
+  late FocusNode _empleadoFocusNode;
+
   // Lógica de roles
   bool get isCliente =>
       widget.user?["rol"]?.toString().toLowerCase() == "cliente";
@@ -119,12 +133,20 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
     super.initState();
     _apiService = ApiService(token: widget.token);
     _pageController = PageController(initialPage: 0);
+    
+    // Inicializar TextEditingControllers
     _servicioSearchController = TextEditingController();
     _servicioSearchController.addListener(_onServiceSearchChanged);
     _clienteSearchController = TextEditingController();
     _clienteSearchController.addListener(_onClienteSearchChanged);
     _empleadoSearchController = TextEditingController();
     _empleadoSearchController.addListener(_onEmpleadoSearchChanged);
+    
+    // Inicializar FocusNodes
+    _servicioFocusNode = FocusNode();
+    _clienteFocusNode = FocusNode();
+    _empleadoFocusNode = FocusNode();
+    
     _loadInitialData();
   }
 
@@ -137,6 +159,9 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
       // Load ALL services from all pages (API has 5 records per page)
       futures.add(_loadAllServicios());
       futures.add(_apiService.getMetodosPago().then((data) => metodosPago = data));
+      
+      // Cargar horarios de TODOS los empleados para verificar cuáles tienen horas
+      futures.add(_loadEmpleadosHorariosInfo());
 
       await Future.wait(futures);
       
@@ -301,11 +326,26 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
   }
 
   void _updatePaginationForEmpleados() {
+    // Filtrar solo empleados que tienen horarios registrados
+    // Si empleadosConHoras está vacío, mostrar todos (aún se están cargando)
+    final empleadosConHorasDisponibles = empleados
+        .where((e) {
+          // Si no tenemos información sobre este empleado, incluirlo por defecto
+          if (!empleadosConHoras.containsKey(e.documentoEmpleado)) {
+            return true;
+          }
+          // Si tenemos información, solo incluir si tiene horas
+          return empleadosConHoras[e.documentoEmpleado] == true;
+        })
+        .toList();
+    
+    print('Empleados para mostrar: ${empleadosConHorasDisponibles.length} de ${empleados.length}');
+    
     // Inicializar lista filtrada si está vacía
     if (_empleadosFiltered.isEmpty) {
-      _empleadosFiltered = List.from(empleados);
+      _empleadosFiltered = List.from(empleadosConHorasDisponibles);
     }
-    _totalEmpleadoPages = (empleados.length / _itemsPerPage).ceil();
+    _totalEmpleadoPages = (empleadosConHorasDisponibles.length / _itemsPerPage).ceil();
     if (_totalEmpleadoPages == 0) _totalEmpleadoPages = 1;
     _currentEmpleadoPage = 1;
     _updateDisplayedEmpleados();
@@ -380,18 +420,81 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
     _displayedClientesFiltered = _clientesFiltered.sublist(start, end);
   }
 
+  // Cargar información de horarios de todos los empleados
+  Future<void> _loadEmpleadosHorariosInfo() async {
+    try {
+      // Si no hay empleados, no hay nada que cargar
+      if (empleados.isEmpty) {
+        print('⚠️ No hay empleados cargados');
+        return;
+      }
+      
+      print('🔄 Cargando horarios de ${empleados.length} empleados...');
+      
+      for (final empleado in empleados) {
+        try {
+          final horarios = await _apiService.getHorariosEmpleado(empleado.documentoEmpleado);
+          // Un empleado tiene horas si tiene al menos un horario activo
+          final tieneHoras = horarios.isNotEmpty && horarios.any((h) => h.estado);
+          empleadosConHoras[empleado.documentoEmpleado] = tieneHoras;
+          print('✓ ${empleado.nombre} (${empleado.documentoEmpleado}): ${tieneHoras ? 'Tiene horas ✓' : 'Sin horas ✗'}');
+        } catch (e) {
+          print('Error cargando horarios de ${empleado.nombre}: $e');
+          // Por defecto, mostrar el empleado si hay error al cargar horarios
+          empleadosConHoras[empleado.documentoEmpleado] = true;
+        }
+      }
+      
+      print('✅ Horarios cargados. Total empleados: ${empleados.length}, Con horas: ${empleadosConHoras.values.where((v) => v).length}');
+    } catch (e) {
+      print('Error en _loadEmpleadosHorariosInfo: $e');
+      // Si hay error general, marcar todos como con horas para no bloquear
+      for (final empleado in empleados) {
+        empleadosConHoras[empleado.documentoEmpleado] = true;
+      }
+    }
+  }
+
+  // Verificar si un empleado tiene horas disponibles
+  Future<bool> _empleadoTieneHoras(Empleado empleado) async {
+    try {
+      final horarios = await _apiService.getHorariosEmpleado(empleado.documentoEmpleado);
+      // Si tiene horarios registrados, tiene horas disponibles
+      return horarios.isNotEmpty && horarios.any((h) => h.estado);
+    } catch (e) {
+      print('Error verificando horarios de ${empleado.nombre}: $e');
+      return true; // Por defecto, mostrar el empleado si hay error
+    }
+  }
+
   void _filterEmpleados(String query) {
     setState(() {
       _empleadoSearchQuery = query.toLowerCase();
-      if (_empleadoSearchQuery.isEmpty) {
-        _empleadosFiltered = List.from(empleados);
-      } else {
-        _empleadosFiltered = empleados
+      
+      // Filtrar por búsqueda
+      List<Empleado> resultado = empleados;
+      
+      if (_empleadoSearchQuery.isNotEmpty) {
+        resultado = empleados
             .where((e) =>
                 e.nombre.toLowerCase().contains(_empleadoSearchQuery) ||
                 e.documentoEmpleado.toLowerCase().contains(_empleadoSearchQuery))
             .toList();
       }
+      
+      // Filtrar solo empleados que tienen horas disponibles
+      // Si no tenemos información sobre horarios, incluir al empleado por defecto
+      _empleadosFiltered = resultado
+          .where((e) {
+            // Si no tenemos información, incluirlo
+            if (!empleadosConHoras.containsKey(e.documentoEmpleado)) {
+              return true;
+            }
+            // Si tenemos información, solo si tiene horas
+            return empleadosConHoras[e.documentoEmpleado] == true;
+          })
+          .toList();
+      
       _currentEmpleadoFilteredPage = 1;
       _totalEmpleadoFilteredPages = (_empleadosFiltered.length / _itemsPerPage).ceil();
       if (_totalEmpleadoFilteredPages == 0) _totalEmpleadoFilteredPages = 1;
@@ -451,15 +554,24 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
   }
 
   void _onServiceSearchChanged() {
-    _filterServicios(_servicioSearchController.text);
+    _servicioSearchTimer?.cancel();
+    _servicioSearchTimer = Timer(const Duration(milliseconds: 300), () {
+      _filterServicios(_servicioSearchController.text);
+    });
   }
 
   void _onClienteSearchChanged() {
-    _filterClientes(_clienteSearchController.text);
+    _clienteSearchTimer?.cancel();
+    _clienteSearchTimer = Timer(const Duration(milliseconds: 300), () {
+      _filterClientes(_clienteSearchController.text);
+    });
   }
 
   void _onEmpleadoSearchChanged() {
-    _filterEmpleados(_empleadoSearchController.text);
+    _empleadoSearchTimer?.cancel();
+    _empleadoSearchTimer = Timer(const Duration(milliseconds: 300), () {
+      _filterEmpleados(_empleadoSearchController.text);
+    });
   }
 
   Widget _buildPaginationControls({
@@ -609,7 +721,10 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
 
   // Cargar horarios del empleado seleccionado y citas de la fecha
   Future<void> _loadEmpleadoHorarios() async {
-    if (selectedEmpleado == null || selectedDate == null) return;
+    if (selectedEmpleado == null || selectedDate == null) {
+      print('⚠️ No se puede cargar horarios: empleado=$selectedEmpleado, fecha=$selectedDate');
+      return;
+    }
 
     print('========================================');
     print('CARGANDO DATOS DEL EMPLEADO');
@@ -618,6 +733,8 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
     print('Documento: ${selectedEmpleado?.documentoEmpleado}');
     print('Fecha: ${DateFormat('yyyy-MM-dd').format(selectedDate!)}');
 
+    if (!mounted) return;
+    
     setState(() {
       loadingHorarios = true;
     });
@@ -630,6 +747,10 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
           .then((data) {
             print('✅ Horarios cargados: ${data.length}');
             horariosEmpleado = data;
+          })
+          .catchError((e) {
+            print('❌ Error cargando horarios: $e');
+            horariosEmpleado = [];
           }));
       
       // Cargar HORAS DISPONIBLES desde la API
@@ -638,6 +759,10 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
           .then((horas) {
             print('✅ Horas disponibles desde API: $horas');
             horasDisponiblesApi = horas;
+          })
+          .catchError((e) {
+            print('❌ Error cargando horas disponibles: $e');
+            horasDisponiblesApi = [];
           }));
       
       // Cargar TODAS las citas y filtrarlas manualmente (para calcular rangos)
@@ -649,24 +774,31 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
           final matchEmpleado = cita.documentoEmpleado == selectedEmpleado!.documentoEmpleado;
           final citaFechaStr = DateFormat('yyyy-MM-dd').format(cita.fechaCita);
           final matchFecha = citaFechaStr == fechaStr;
-          print('  - Evaluando cita ID=${cita.agendaId}: Empleado=${cita.documentoEmpleado} vs ${selectedEmpleado!.documentoEmpleado} (match=$matchEmpleado), Fecha=${citaFechaStr} vs ${fechaStr} (match=$matchFecha)');
           return matchEmpleado && matchFecha;
         }).toList();
         
         print('✅ Citas filtradas para empleado y fecha: ${citasFiltradas.length}');
-        for (int i = 0; i < citasFiltradas.length; i++) {
-          final cita = citasFiltradas[i];
-          print('  - Cita ${i+1}: ID=${cita.agendaId}, Hora=${cita.horaInicio}, Estado=${cita.nombreEstado}, Empleado=${cita.documentoEmpleado}, Fecha=${cita.fechaCita}');
-        }
-        
         citasEmpleadoFecha = citasFiltradas;
+      })
+      .catchError((e) {
+        print('❌ Error cargando citas: $e');
+        citasEmpleadoFecha = [];
       }));
 
       await Future.wait(futures);
+      
+      if (!mounted) return;
+      
       print('✅ Todos los datos cargados, calculando slots...');
       _calculateAvailableSlots();
     } catch (e) {
       print("❌ Error cargando horarios del empleado: $e");
+      if (mounted) {
+        setState(() {
+          availableTimeSlots = [];
+          loadingHorarios = false;
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -703,47 +835,58 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
     print('INICIANDO CÁLCULO DE HORARIOS (RESTRICCIÓN MANUAL)');
     print('========================================');
     
+    // Verificaciones previas
+    if (selectedDate == null) {
+      print('⚠️ selectedDate es null, no se pueden calcular slots');
+      availableTimeSlots = [];
+      setState(() {});
+      return;
+    }
+    
+    if (selectedEmpleado == null) {
+      print('⚠️ selectedEmpleado es null, no se pueden calcular slots');
+      availableTimeSlots = [];
+      setState(() {});
+      return;
+    }
+    
     // 0. VERIFICAR TODOS LOS DATOS QUE TENEMOS
     print('--- DATOS DISPONIBLES ---');
     print('selectedEmpleado: ${selectedEmpleado?.nombre}');
     print('Documento: ${selectedEmpleado?.documentoEmpleado}');
     print('selectedDate: ${selectedDate != null ? DateFormat('yyyy-MM-dd').format(selectedDate!) : 'null'}');
     print('citasEmpleadoFecha: ${citasEmpleadoFecha.length} citas');
-    for (int i = 0; i < citasEmpleadoFecha.length; i++) {
-      final c = citasEmpleadoFecha[i];
-      print('  - Cita $i: ID=${c.agendaId}, Hora=${c.horaInicio}, Estado=${c.nombreEstado}, Fecha=${c.fechaCita}');
-    }
+    print('horariosEmpleado: ${horariosEmpleado.length} horarios');
+    print('horasDisponiblesApi: ${horasDisponiblesApi.length} horas');
     
-    // Datos básicos
-    final selectedDateStr = selectedDate != null ? DateFormat('yyyy-MM-dd').format(selectedDate!) : '';
-    print('Fecha seleccionada: $selectedDateStr');
-    
-    // Obtener el día de la semana
-    final daysOfWeek = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
-    final selectedDayName = selectedDate != null ? daysOfWeek[selectedDate!.weekday - 1].toLowerCase() : '';
-    print('Día: $selectedDayName');
-    
-    // 1. Verificar si el empleado trabaja hoy
-    bool empleadoTrabajaHoy = true;
-    HorarioEmpleado? horarioDia;
-    
-    if (horariosEmpleado.isNotEmpty) {
-      try {
-        horarioDia = horariosEmpleado.firstWhere((h) {
-          final dia = h.horario?.diaSemana.toLowerCase() ?? '';
-          return dia.contains(selectedDayName) || selectedDayName.contains(dia);
-        });
-      } catch (_) {
-        empleadoTrabajaHoy = false;
+    try {
+      // Obtener el día de la semana
+      final daysOfWeek = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
+      final selectedDayName = daysOfWeek[selectedDate!.weekday - 1].toLowerCase();
+      print('Día: $selectedDayName');
+      
+      // 1. Verificar si el empleado trabaja hoy
+      bool empleadoTrabajaHoy = true;
+      HorarioEmpleado? horarioDia;
+      
+      if (horariosEmpleado.isNotEmpty) {
+        try {
+          horarioDia = horariosEmpleado.firstWhere((h) {
+            final dia = h.horario?.diaSemana.toLowerCase() ?? '';
+            return dia.contains(selectedDayName) || selectedDayName.contains(dia);
+          });
+        } catch (_) {
+          empleadoTrabajaHoy = false;
+        }
       }
-    }
-    
-    if (!empleadoTrabajaHoy) {
-      print('El empleado NO trabaja hoy');
-      availableTimeSlots = _generateAllDaySlots(TimeSlotStatus.unavailable);
-      setState(() {});
-      return;
-    }
+      
+      if (!empleadoTrabajaHoy) {
+        print('El empleado NO trabaja hoy');
+        availableTimeSlots = _generateAllDaySlots(TimeSlotStatus.unavailable);
+        setState(() {});
+        return;
+      }
+      
     
     print('El empleado SÍ trabaja hoy');
     
@@ -972,19 +1115,25 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
     }
     
     // Resumen final
-    availableTimeSlots = slots;
-    print('========================================');
-    print('RESUMEN FINAL:');
-    print('  - Total iteraciones: $iteraciones (máximo: $maxIteraciones)');
-    if (iteraciones >= maxIteraciones) {
-      print('  ⚠️ ADVERTENCIA: Se alcanzó el límite de iteraciones');
+      availableTimeSlots = slots;
+      print('========================================');
+      print('RESUMEN FINAL:');
+      print('  - Total iteraciones: $iteraciones (máximo: $maxIteraciones)');
+      if (iteraciones >= maxIteraciones) {
+        print('  ⚠️ ADVERTENCIA: Se alcanzó el límite de iteraciones');
+      }
+      print('  - Disponibles: ${slots.where((s) => s.isAvailable).length}');
+      print('  - Reservados: ${slots.where((s) => s.isReserved).length}');
+      print('  - No disponibles: ${slots.where((s) => s.isUnavailable).length}');
+      print('========================================');
+      
+      setState(() {});
+    } catch (e, stackTrace) {
+      print('❌ Error calculando horarios: $e');
+      print('Stack trace: $stackTrace');
+      availableTimeSlots = [];
+      setState(() {});
     }
-    print('  - Disponibles: ${slots.where((s) => s.isAvailable).length}');
-    print('  - Reservados: ${slots.where((s) => s.isReserved).length}');
-    print('  - No disponibles: ${slots.where((s) => s.isUnavailable).length}');
-    print('========================================');
-    
-    setState(() {});
   }
 
   // Generar slots para todo el día con el mismo estado
@@ -1055,13 +1204,20 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
     return format.format(time);
   }
 
-  // Generar horarios por defecto (solo para compatibilidad)
   @override
   void dispose() {
     _pageController.dispose();
     _servicioSearchController.dispose();
     _clienteSearchController.dispose();
     _empleadoSearchController.dispose();
+    // Limpiar timers de debounce
+    _servicioSearchTimer?.cancel();
+    _clienteSearchTimer?.cancel();
+    _empleadoSearchTimer?.cancel();
+    // Limpiar FocusNodes
+    _servicioFocusNode.dispose();
+    _clienteFocusNode.dispose();
+    _empleadoFocusNode.dispose();
     super.dispose();
   }
 
@@ -1121,7 +1277,7 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
 
     // Paso 7: Confirmación (todos los roles)
     steps.add(_confirmationScreen());
-
+    
     return steps;
   }
 
@@ -1296,6 +1452,8 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
                   ),
                   child: TextField(
                     controller: _servicioSearchController,
+                    focusNode: _servicioFocusNode,
+                    textInputAction: TextInputAction.search,
                     decoration: InputDecoration(
                       hintText: "¿Qué servicio buscas?",
                       hintStyle: const TextStyle(color: Colors.grey),
@@ -1307,111 +1465,107 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
                 ),
                 const SizedBox(height: 20),
                 Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        ListView.builder(
-                          padding: EdgeInsets.zero,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _displayedServicios.length,
-                          itemBuilder: (context, index) {
-                            final servicio = _displayedServicios[index];
-                            final isSelected = serviciosSeleccionados.contains(servicio.servicioId);
-                            return GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  if (isSelected) {
-                                    serviciosSeleccionados.remove(servicio.servicioId);
-                                  } else {
-                                    serviciosSeleccionados.add(servicio.servicioId);
-                                  }
-                                });
-                                // Recalcular slots en el siguiente frame después de que setState termine
-                                Future.microtask(() {
-                                  if (selectedEmpleado != null && selectedDate != null && mounted) {
-                                    _calculateAvailableSlots();
-                                  }
-                                });
-                              },
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                padding: const EdgeInsets.all(16),
+                  child: ListView.builder(
+                    padding: EdgeInsets.zero,
+                    itemCount: _displayedServicios.length + 1,
+                    itemBuilder: (context, index) {
+                      // Último item: controles de paginación
+                      if (index == _displayedServicios.length) {
+                        return _buildPaginationControls(
+                          currentPage: _currentServicePage,
+                          totalPages: _totalServicePages,
+                          onPageChange: _changeServicePage,
+                        );
+                      }
+                      
+                      final servicio = _displayedServicios[index];
+                      final isSelected = serviciosSeleccionados.contains(servicio.servicioId);
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            if (isSelected) {
+                              serviciosSeleccionados.remove(servicio.servicioId);
+                            } else {
+                              serviciosSeleccionados.add(servicio.servicioId);
+                            }
+                          });
+                          // Recalcular slots en el siguiente frame después de que setState termine
+                          Future.microtask(() {
+                            if (selectedEmpleado != null && selectedDate != null && mounted) {
+                              _calculateAvailableSlots();
+                            }
+                          });
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: isSelected ? const Color(0xFFE54BCF) : Colors.grey.shade200,
+                              width: isSelected ? 2 : 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 24,
+                                height: 24,
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(18),
+                                  shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: isSelected ? const Color(0xFFE54BCF) : Colors.grey.shade200,
-                                    width: isSelected ? 2 : 1,
+                                    color: isSelected ? const Color(0xFFE54BCF) : Colors.grey.shade400,
+                                    width: 2,
                                   ),
+                                  color: isSelected ? const Color(0xFFE54BCF) : Colors.white,
                                 ),
-                                child: Row(
+                                child: isSelected
+                                    ? const Icon(Icons.check, color: Colors.white, size: 16)
+                                    : null,
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Container(
-                                      width: 24,
-                                      height: 24,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: isSelected ? const Color(0xFFE54BCF) : Colors.grey.shade400,
-                                          width: 2,
-                                        ),
-                                        color: isSelected ? const Color(0xFFE54BCF) : Colors.white,
-                                      ),
-                                      child: isSelected
-                                          ? const Icon(Icons.check, color: Colors.white, size: 16)
-                                          : null,
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            servicio.nombre,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Row(
-                                            children: [
-                                              const Icon(Icons.timer, color: Colors.grey, size: 14),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                "${servicio.duracion} min",
-                                                style: TextStyle(
-                                                  color: Colors.grey[600],
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
                                     Text(
-                                      _formatCurrency(servicio.precio),
+                                      servicio.nombre,
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 16,
-                                        color: Color(0xFF7926F7),
                                       ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.timer, color: Colors.grey, size: 14),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          "${servicio.duracion} min",
+                                          style: TextStyle(
+                                            color: Colors.grey[600],
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
                               ),
-                            );
-                          },
+                              Text(
+                                _formatCurrency(servicio.precio),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: Color(0xFF7926F7),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        _buildPaginationControls(
-                          currentPage: _currentServicePage,
-                          totalPages: _totalServicePages,
-                          onPageChange: _changeServicePage,
-                        ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -1512,6 +1666,8 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
                   ),
                   child: TextField(
                     controller: _empleadoSearchController,
+                    focusNode: _empleadoFocusNode,
+                    textInputAction: TextInputAction.search,
                     decoration: InputDecoration(
                       hintText: "Buscar profesional por nombre o documento...",
                       hintStyle: const TextStyle(color: Colors.grey),
@@ -1523,91 +1679,86 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
                 ),
                 const SizedBox(height: 20),
                 Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        ListView.builder(
-                          padding: EdgeInsets.zero,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _displayedEmpleadosFiltered.length,
-                          itemBuilder: (context, index) {
-                            final empleado = _displayedEmpleadosFiltered[index];
-                            final isSelected = selectedEmpleado?.documentoEmpleado == empleado.documentoEmpleado;
-                            return GestureDetector(
-                              onTap: () async {
-                                setState(() {
-                                  selectedEmpleado = empleado;
-                                });
-                                await _loadEmpleadoHorarios();
-                              },
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                padding: const EdgeInsets.all(16),
+                  child: ListView.builder(
+                    padding: EdgeInsets.zero,
+                    itemCount: _displayedEmpleadosFiltered.length + (_totalEmpleadoFilteredPages > 1 ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      // Último item: controles de paginación (si hay múltiples páginas)
+                      if (index == _displayedEmpleadosFiltered.length) {
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 20),
+                          child: _buildPaginationControls(
+                            currentPage: _currentEmpleadoFilteredPage,
+                            totalPages: _totalEmpleadoFilteredPages,
+                            onPageChange: _changeEmpleadoFilteredPage,
+                          ),
+                        );
+                      }
+                      
+                      final empleado = _displayedEmpleadosFiltered[index];
+                      final isSelected = selectedEmpleado?.documentoEmpleado == empleado.documentoEmpleado;
+                      return GestureDetector(
+                        onTap: () async {
+                          setState(() {
+                            selectedEmpleado = empleado;
+                          });
+                          await _loadEmpleadoHorarios();
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: isSelected ? const Color(0xFFE54BCF) : Colors.grey.shade200,
+                              width: isSelected ? 2 : 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 48,
+                                height: 48,
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(18),
-                                  border: Border.all(
-                                    color: isSelected ? const Color(0xFFE54BCF) : Colors.grey.shade200,
-                                    width: isSelected ? 2 : 1,
-                                  ),
+                                  color: Colors.purple.shade100,
+                                  shape: BoxShape.circle,
                                 ),
-                                child: Row(
+                                child: const Icon(
+                                  Icons.person,
+                                  color: Color(0xFF7926F7),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Container(
-                                      width: 48,
-                                      height: 48,
-                                      decoration: BoxDecoration(
-                                        color: Colors.purple.shade100,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.person,
-                                        color: Color(0xFF7926F7),
+                                    Text(
+                                      empleado.nombre,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
                                       ),
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            empleado.nombre,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 14,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            empleado.documentoEmpleado,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey[600],
-                                            ),
-                                          ),
-                                        ],
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      empleado.documentoEmpleado,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
                                       ),
                                     ),
-                                    if (isSelected)
-                                      const Icon(Icons.check_circle, color: Color(0xFFE54BCF), size: 24),
                                   ],
                                 ),
                               ),
-                            );
-                          },
-                        ),
-                        if (_totalEmpleadoFilteredPages > 1)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 20),
-                            child: _buildPaginationControls(
-                              currentPage: _currentEmpleadoFilteredPage,
-                              totalPages: _totalEmpleadoFilteredPages,
-                              onPageChange: _changeEmpleadoFilteredPage,
-                            ),
+                              if (isSelected)
+                                const Icon(Icons.check_circle, color: Color(0xFFE54BCF), size: 24),
+                            ],
                           ),
-                      ],
-                    ),
+                        ),
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -2431,6 +2582,12 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
                           elevation: 0,
                         ),
                         onPressed: () {
+                          print('========================================');
+                          print('👤 USUARIO CONFIRMA VER MIS CITAS');
+                          print('========================================');
+                          print('Retornando a pantalla anterior...');
+                          
+                          // Retornar con true para indicar que se agendó/reprogramó exitosamente
                           Navigator.pop(context, true);
                         },
                         child: const Text(
@@ -2652,6 +2809,8 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
                   ),
                   child: TextField(
                     controller: _clienteSearchController,
+                    focusNode: _clienteFocusNode,
+                    textInputAction: TextInputAction.search,
                     decoration: InputDecoration(
                       hintText: "Buscar cliente por nombre o documento...",
                       hintStyle: const TextStyle(color: Colors.grey),
@@ -2663,90 +2822,85 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
                 ),
                 const SizedBox(height: 20),
                 Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        ListView.builder(
-                          padding: EdgeInsets.zero,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _displayedClientesFiltered.length,
-                          itemBuilder: (context, index) {
-                            final cliente = _displayedClientesFiltered[index];
-                            final isSelected = selectedCliente?.documentoCliente == cliente.documentoCliente;
-                            return GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  selectedCliente = cliente;
-                                });
-                              },
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                padding: const EdgeInsets.all(16),
+                  child: ListView.builder(
+                    padding: EdgeInsets.zero,
+                    itemCount: _displayedClientesFiltered.length + (_totalClienteFilteredPages > 1 ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      // Último item: controles de paginación (si hay múltiples páginas)
+                      if (index == _displayedClientesFiltered.length) {
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 20),
+                          child: _buildPaginationControls(
+                            currentPage: _currentClienteFilteredPage,
+                            totalPages: _totalClienteFilteredPages,
+                            onPageChange: _changeClienteFilteredPage,
+                          ),
+                        );
+                      }
+                      
+                      final cliente = _displayedClientesFiltered[index];
+                      final isSelected = selectedCliente?.documentoCliente == cliente.documentoCliente;
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            selectedCliente = cliente;
+                          });
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: isSelected ? const Color(0xFFE54BCF) : Colors.grey.shade200,
+                              width: isSelected ? 2 : 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 48,
+                                height: 48,
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(18),
-                                  border: Border.all(
-                                    color: isSelected ? const Color(0xFFE54BCF) : Colors.grey.shade200,
-                                    width: isSelected ? 2 : 1,
-                                  ),
+                                  color: Colors.purple.shade100,
+                                  shape: BoxShape.circle,
                                 ),
-                                child: Row(
+                                child: const Icon(
+                                  Icons.person,
+                                  color: Color(0xFF7926F7),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Container(
-                                      width: 48,
-                                      height: 48,
-                                      decoration: BoxDecoration(
-                                        color: Colors.purple.shade100,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.person,
-                                        color: Color(0xFF7926F7),
+                                    Text(
+                                      cliente.nombre,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
                                       ),
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            cliente.nombre,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 14,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            cliente.documentoCliente,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey[600],
-                                            ),
-                                          ),
-                                        ],
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      cliente.documentoCliente,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
                                       ),
                                     ),
-                                    if (isSelected)
-                                      const Icon(Icons.check_circle, color: Color(0xFFE54BCF), size: 24),
                                   ],
                                 ),
                               ),
-                            );
-                          },
-                        ),
-                        if (_totalClienteFilteredPages > 1)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 20),
-                            child: _buildPaginationControls(
-                              currentPage: _currentClienteFilteredPage,
-                              totalPages: _totalClienteFilteredPages,
-                              onPageChange: _changeClienteFilteredPage,
-                            ),
+                              if (isSelected)
+                                const Icon(Icons.check_circle, color: Color(0xFFE54BCF), size: 24),
+                            ],
                           ),
-                      ],
-                    ),
+                        ),
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -2890,6 +3044,17 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
 
       if (widget.agendaToEdit != null) {
         // Actualizar cita existente
+        print('========================================');
+        print('🔄 PREPARANDO ACTUALIZACIÓN DE CITA');
+        print('========================================');
+        print('Agenda ID a actualizar: ${widget.agendaToEdit!.agendaId}');
+        print('Documento Cliente: ${selectedCliente!.documentoCliente}');
+        print('Documento Empleado: ${selectedEmpleado!.documentoEmpleado}');
+        print('Fecha: ${selectedDate!}');
+        print('Hora: ${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}:00');
+        print('Servicios seleccionados: $serviciosSeleccionados');
+        print('Método de pago: ${selectedMetodoPago?.metodopagoId}');
+        
         final agenda = Agenda(
           agendaId: widget.agendaToEdit!.agendaId,
           documentoCliente: selectedCliente!.documentoCliente,
@@ -2908,7 +3073,10 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
               .toList(),
         );
 
+        print('📤 Enviando PUT request...');
         agendaResultado = await _apiService.updateAgenda(agenda.agendaId!, agenda);
+        print('✅ Respuesta recibida del servidor');
+        print('Resultado: ${agendaResultado.agendaId}');
       } else {
         // Crear nueva cita
         final agenda = Agenda(
@@ -2932,9 +3100,56 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
       }
 
       if (mounted) {
-        Navigator.pop(context, agendaResultado);
+        print('========================================');
+        print('✅ CITA ENVIADA EXITOSAMENTE');
+        print('========================================');
+        
+        // Calcular el índice del paso de confirmación
+        final steps = _getSteps();
+        final confirmationStepIndex = steps.length - 1;
+        
+        print('Total de pasos: ${steps.length}');
+        print('Índice de confirmación esperado: $confirmationStepIndex');
+        print('currentStep actual: $currentStep');
+        
+        // Actualizar currentStep ANTES de animar, para asegurar que sea correcto
+        setState(() {
+          currentStep = confirmationStepIndex;
+          isLoading = false;
+        });
+        
+        // Esperar a que el rebuild termine antes de animar el PageView
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _pageController.hasClients) {
+            print('📄 Animando PageView a página $confirmationStepIndex');
+            try {
+              _pageController.animateToPage(
+                confirmationStepIndex,
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.easeInOut,
+              );
+              print('✅ Animación exitosa');
+            } catch (e) {
+              print('❌ Error en animateToPage: $e');
+              try {
+                _pageController.jumpToPage(confirmationStepIndex);
+                print('✅ jumpToPage exitoso como fallback');
+              } catch (e2) {
+                print('❌ Error en jumpToPage: $e2');
+              }
+            }
+          } else {
+            print('⚠️ No se pudo animar: mounted=$mounted, hasClients=${_pageController.hasClients}');
+          }
+        });
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('========================================');
+      print('❌ ERROR EN CONFIRMACIÓN DE CITA');
+      print('========================================');
+      print('Error: $e');
+      print('Stack Trace: $stackTrace');
+      print('isLoading: $isLoading');
       if (mounted) {
         final message = widget.agendaToEdit != null 
             ? 'Error al actualizar la cita: $e' 

@@ -326,7 +326,13 @@ class ApiService {
   Future<Agenda> updateAgenda(int id, Agenda agenda) async {
     try {
       final jsonData = agenda.toJson();
-      print('Enviando datos para actualizar cita: ${json.encode(jsonData)}');
+      print('========================================');
+      print('🔄 ACTUALIZANDO CITA (PUT REQUEST)');
+      print('========================================');
+      print('URL: $baseUrl/Agenda/$id');
+      print('Agenda ID: $id');
+      print('Datos enviados: ${json.encode(jsonData)}');
+      print('Headers: $_headers');
 
       final response = await http
           .put(
@@ -336,26 +342,34 @@ class ApiService {
           )
           .timeout(timeoutDuration);
 
-      print(
-        'Respuesta del servidor: ${response.statusCode} - ${response.body}',
-      );
+      print('========================================');
+      print('📊 RESPUESTA DEL SERVIDOR');
+      print('========================================');
+      print('Status Code: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+      print('Response Headers: ${response.headers}');
 
       if (response.statusCode == 200 || response.statusCode == 204) {
+        print('✅ PUT Request exitoso (${response.statusCode})');
         // Intentar obtener la cita actualizada
         try {
           if (response.body.trim().isNotEmpty) {
+            print('📄 Intentando parsear respuesta...');
             final dynamic data = _parseJson(response.body);
             if (data is Map<String, dynamic>) {
+              print('✅ Respuesta parseada como Agenda');
               return Agenda.fromJson(data);
             }
           }
           // Si no hay respuesta, intentar obtener la cita actualizada
+          print('📥 Obteniendo cita actualizada desde el servidor...');
           return await getAgendaById(id);
         } catch (e) {
-          print('Error al obtener cita actualizada: $e');
+          print('⚠️ Error al obtener cita actualizada: $e');
           return agenda;
         }
       } else if (response.statusCode == 400) {
+        print('❌ Error 400 - Bad Request');
         // Manejar errores de validación (400 Bad Request)
         try {
           final errorData = json.decode(response.body);
@@ -373,6 +387,10 @@ class ApiService {
                   }
                 });
                 if (messages.isNotEmpty) {
+                  print('❌ Errores de validación:');
+                  for (final msg in messages) {
+                    print('  - $msg');
+                  }
                   throw Exception(
                     'Errores de validación:\n${messages.join('\n')}',
                   );
@@ -381,6 +399,7 @@ class ApiService {
             }
             // Caso 2: Mensaje directo { "message": "..." }
             if (errorData.containsKey('message')) {
+              print('❌ Mensaje de error: ${errorData['message']}');
               throw Exception(errorData['message']);
             }
           }
@@ -389,83 +408,220 @@ class ApiService {
         }
         throw Exception('Error de validación (400): ${response.body}');
       } else {
+        print('❌ Error ${response.statusCode}');
         // Intentar parsear el mensaje de error de la API
         try {
           final errorData = json.decode(response.body);
           if (errorData is Map<String, dynamic> &&
               errorData.containsKey('message')) {
+            print('❌ Mensaje de error de API: ${errorData['message']}');
             throw Exception(
               errorData['message'] ?? 'Error al actualizar la cita',
             );
           }
         } catch (e) {
           // Si no se puede parsear, usar el mensaje original
+          print('⚠️ No se pudo parsear mensaje de error: $e');
         }
         throw Exception(
           'Error al actualizar la cita: ${response.statusCode} - ${response.body}',
         );
       }
     } catch (e) {
+      print('❌ ERROR DE CONEXIÓN AL ACTUALIZAR: $e');
       throw Exception('Error de conexión: $e');
     }
   }
 
-  // Confirmar una cita
+  // Confirmar una cita (cambiar estado a Confirmado - ID: 2)
   Future<Agenda> confirmarCita(int id) async {
+    print('========================================');
+    print('🔍 INICIANDO CONFIRMACIÓN DE CITA');
+    print('========================================');
+    print('Agenda ID: $id');
+    
     try {
+      final jsonData = {'estadoId': 2};
+      print('� Enviando PUT a: $baseUrl/Agenda/$id/estado');
+      print('📄 JSON: ${json.encode(jsonData)}');
+      
       final response = await http
           .put(
-            Uri.parse('$baseUrl/Agenda/$id/confirmar'),
+            Uri.parse('$baseUrl/Agenda/$id/estado'),
             headers: _headers,
+            body: json.encode(jsonData),
           )
           .timeout(timeoutDuration);
 
+      print('Status Code: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+
       if (response.statusCode == 200 || response.statusCode == 204) {
-        return await getAgendaById(id);
+        print('✅ PUT Request exitoso (${response.statusCode})');
+        
+        // Intentar parsear la respuesta
+        if (response.body.trim().isNotEmpty && response.statusCode == 200) {
+          try {
+            final dynamic data = _parseJson(response.body);
+            if (data is Map<String, dynamic>) {
+              print('✅ Respuesta parseada correctamente');
+              return Agenda.fromJson(data);
+            }
+          } catch (e) {
+            print('⚠️ Error parseando respuesta: $e');
+          }
+        }
+        
+        // Si no hay respuesta con contenido, retornar objeto dummy actualizado
+        print('⚠️ Sin respuesta con contenido, retornando objeto actualizado');
+        return Agenda(
+          agendaId: id,
+          documentoCliente: '',
+          documentoEmpleado: '',
+          fechaCita: DateTime.now(),
+          horaInicio: '00:00',
+          estadoId: 2,
+          metodopagoId: 1,
+          nombreEstado: 'Confirmado',
+        );
+      } else {
+        throw Exception('Error al confirmar estado: ${response.statusCode} - ${response.body}');
       }
-      throw Exception('Error al confirmar la cita: ${response.statusCode}');
-    } catch (e) {
-      throw Exception('Error de conexión: $e');
+    } catch (e, stackTrace) {
+      print('❌ ERROR EN CONFIRMACIÓN');
+      print('Error: $e');
+      print('Stack trace: $stackTrace');
+      print('========================================');
+      throw Exception('Error al confirmar la cita: $e');
     }
   }
 
-  // Completar una cita
+  // Completar una cita (cambiar estado a Completado - ID: 4)
   Future<Agenda> completarCita(int id) async {
+    print('========================================');
+    print('🔍 INICIANDO COMPLETACIÓN DE CITA');
+    print('========================================');
+    print('Agenda ID: $id');
+    
     try {
+      final jsonData = {'estadoId': 4};
+      print('� Enviando PUT a: $baseUrl/Agenda/$id/estado');
+      print('📄 JSON: ${json.encode(jsonData)}');
+      
       final response = await http
           .put(
-            Uri.parse('$baseUrl/Agenda/$id/completar'),
+            Uri.parse('$baseUrl/Agenda/$id/estado'),
             headers: _headers,
+            body: json.encode(jsonData),
           )
           .timeout(timeoutDuration);
 
+      print('Status Code: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+
       if (response.statusCode == 200 || response.statusCode == 204) {
-        return await getAgendaById(id);
+        print('✅ PUT Request exitoso (${response.statusCode})');
+        
+        // Intentar parsear la respuesta
+        if (response.body.trim().isNotEmpty && response.statusCode == 200) {
+          try {
+            final dynamic data = _parseJson(response.body);
+            if (data is Map<String, dynamic>) {
+              print('✅ Respuesta parseada correctamente');
+              return Agenda.fromJson(data);
+            }
+          } catch (e) {
+            print('⚠️ Error parseando respuesta: $e');
+          }
+        }
+        
+        // Si no hay respuesta con contenido, retornar objeto dummy actualizado
+        print('⚠️ Sin respuesta con contenido, retornando objeto actualizado');
+        return Agenda(
+          agendaId: id,
+          documentoCliente: '',
+          documentoEmpleado: '',
+          fechaCita: DateTime.now(),
+          horaInicio: '00:00',
+          estadoId: 4,
+          metodopagoId: 1,
+          nombreEstado: 'Completado',
+        );
+      } else {
+        throw Exception('Error al completar estado: ${response.statusCode} - ${response.body}');
       }
-      throw Exception('Error al completar la cita: ${response.statusCode}');
-    } catch (e) {
-      throw Exception('Error de conexión: $e');
+    } catch (e, stackTrace) {
+      print('❌ ERROR EN COMPLETACIÓN');
+      print('Error: $e');
+      print('Stack trace: $stackTrace');
+      print('========================================');
+      throw Exception('Error al completar la cita: $e');
     }
   }
 
-  // Cancelar una cita
+  // Cancelar una cita (cambiar estado a Cancelado - ID: 3)
   Future<Agenda> cancelarCita(int id) async {
+    print('========================================');
+    print('🔍 INICIANDO CANCELACIÓN DE CITA');
+    print('========================================');
+    print('Agenda ID: $id');
+    
     try {
+      final jsonData = {'estadoId': 3};
+      print('� Enviando PUT a: $baseUrl/Agenda/$id/estado');
+      print('📄 JSON: ${json.encode(jsonData)}');
+      
       final response = await http
           .put(
-            Uri.parse('$baseUrl/Agenda/$id/cancelar'),
+            Uri.parse('$baseUrl/Agenda/$id/estado'),
             headers: _headers,
+            body: json.encode(jsonData),
           )
           .timeout(timeoutDuration);
 
+      print('Status Code: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+
       if (response.statusCode == 200 || response.statusCode == 204) {
-        return await getAgendaById(id);
+        print('✅ PUT Request exitoso (${response.statusCode})');
+        
+        // Intentar parsear la respuesta
+        if (response.body.trim().isNotEmpty && response.statusCode == 200) {
+          try {
+            final dynamic data = _parseJson(response.body);
+            if (data is Map<String, dynamic>) {
+              print('✅ Respuesta parseada correctamente');
+              return Agenda.fromJson(data);
+            }
+          } catch (e) {
+            print('⚠️ Error parseando respuesta: $e');
+          }
+        }
+        
+        // Si no hay respuesta con contenido, retornar objeto dummy actualizado
+        print('⚠️ Sin respuesta con contenido, retornando objeto actualizado');
+        return Agenda(
+          agendaId: id,
+          documentoCliente: '',
+          documentoEmpleado: '',
+          fechaCita: DateTime.now(),
+          horaInicio: '00:00',
+          estadoId: 3,
+          metodopagoId: 1,
+          nombreEstado: 'Cancelado',
+        );
+      } else {
+        throw Exception('Error al cancelar estado: ${response.statusCode} - ${response.body}');
       }
-      throw Exception('Error al cancelar la cita: ${response.statusCode}');
-    } catch (e) {
-      throw Exception('Error de conexión: $e');
+    } catch (e, stackTrace) {
+      print('❌ ERROR EN CANCELACIÓN');
+      print('Error: $e');
+      print('Stack trace: $stackTrace');
+      print('========================================');
+      throw Exception('Error al cancelar la cita: $e');
     }
   }
+  
 
   // Eliminar una cita
   Future<void> deleteAgenda(int id) async {
@@ -1323,6 +1479,139 @@ class ApiService {
     } catch (e) {
       print('❌ Excepción en búsqueda de servicios: $e');
       return [];
+    }
+  }
+
+  // Actualizar documento del usuario
+  Future<bool> updateUserDocument(int usuarioId, String documento, String email, int rolId, bool estado) async {
+    try {
+      print('========================================');
+      print('📝 ACTUALIZANDO DOCUMENTO DE USUARIO');
+      print('========================================');
+      print('Usuario ID: $usuarioId');
+      print('Nuevo documento: $documento');
+      print('Email: $email');
+      print('RolId: $rolId');
+      print('Estado: $estado');
+
+      final jsonData = {
+        'rolId': rolId,
+        'email': email,
+        'estado': estado,
+        'documento': documento,
+      };
+      print('📄 Payload: ${json.encode(jsonData)}');
+      print('URL: $baseUrl/Usuarios/$usuarioId');
+
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/Usuarios/$usuarioId'),
+            headers: _headers,
+            body: json.encode(jsonData),
+          )
+          .timeout(timeoutDuration);
+
+      print('Status Code: ${response.statusCode}');
+      if (response.body.isNotEmpty) {
+        print('Response: ${response.body.substring(0, min(200, response.body.length))}');
+      }
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        print('✅ Documento actualizado exitosamente');
+        return true;
+      } else {
+        print('❌ Error ${response.statusCode}');
+        if (response.body.isNotEmpty) {
+          print('Response: ${response.body}');
+        }
+        return false;
+      }
+    } catch (e) {
+      print('❌ EXCEPCIÓN AL ACTUALIZAR DOCUMENTO: $e');
+      return false;
+    }
+  }
+
+  // Cambiar contraseña del usuario
+  Future<void> changePassword(int usuarioId, String newPassword, String confirmPassword) async {
+    try {
+      print('========================================');
+      print('🔐 INICIANDO CAMBIO DE CONTRASEÑA');
+      print('========================================');
+      print('URL: $baseUrl/Usuarios/$usuarioId/contrasena');
+      print('Usuario ID: $usuarioId');
+
+      final jsonData = {
+        'nuevaContrasena': newPassword,
+        'confirmarContrasena': confirmPassword,
+      };
+      print('📄 Payload: ${json.encode(jsonData)}');
+
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/Usuarios/$usuarioId/contrasena'),
+            headers: _headers,
+            body: json.encode(jsonData),
+          )
+          .timeout(timeoutDuration);
+
+      print('Status Code: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        print('✅ Contraseña actualizada exitosamente (${response.statusCode})');
+      } else if (response.statusCode == 400) {
+        print('❌ Error 400 - Bad Request');
+        try {
+          final errorData = json.decode(response.body);
+          if (errorData is Map<String, dynamic>) {
+            if (errorData.containsKey('errors')) {
+              final errors = errorData['errors'];
+              if (errors is Map<String, dynamic>) {
+                final messages = <String>[];
+                errors.forEach((key, value) {
+                  if (value is List) {
+                    messages.addAll(value.map((e) => e.toString()));
+                  } else {
+                    messages.add(value.toString());
+                  }
+                });
+                if (messages.isNotEmpty) {
+                  print('❌ Errores de validación:');
+                  for (final msg in messages) {
+                    print('  - $msg');
+                  }
+                  throw Exception('Errores de validación:\n${messages.join('\n')}');
+                }
+              }
+            }
+            if (errorData.containsKey('message')) {
+              print('❌ Mensaje de error: ${errorData['message']}');
+              throw Exception(errorData['message']);
+            }
+          }
+        } catch (e) {
+          if (e.toString().contains('Exception:')) rethrow;
+        }
+        throw Exception('Error de validación (400): ${response.body}');
+      } else {
+        print('❌ Error ${response.statusCode}');
+        try {
+          final errorData = json.decode(response.body);
+          if (errorData is Map<String, dynamic> && errorData.containsKey('message')) {
+            print('❌ Mensaje de error de API: ${errorData['message']}');
+            throw Exception(errorData['message']);
+          }
+        } catch (e) {
+          print('⚠️ No se pudo parsear mensaje de error: $e');
+        }
+        throw Exception(
+          'Error al cambiar contraseña: ${response.statusCode} - ${response.body}',
+        );
+      }
+    } catch (e) {
+      print('❌ ERROR AL CAMBIAR CONTRASEÑA: $e');
+      throw Exception('Error al cambiar la contraseña: $e');
     }
   }
 }

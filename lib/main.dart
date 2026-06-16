@@ -22,6 +22,9 @@ import 'services/screens/services_page.dart';
 // THEME
 import 'core/utils/colors.dart';
 
+// SESSION
+import 'core/services/session_service.dart';
+
 void main() {
   runApp(const MyApp());
 }
@@ -52,12 +55,13 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
 
-      // 🚦 Ruta inicial
-      initialRoute: '/login',
+      // 🚦 Ruta inicial - Ahora va a una pantalla de verificación
+      initialRoute: '/splash',
 
       // 🧭 Rutas
       routes: {
         // AUTH
+        '/splash': (_) => const SplashScreen(),
         '/': (_) => LoginPage(),
         '/login': (_) => LoginPage(),
         '/register': (_) => RegisterPage(),
@@ -84,6 +88,125 @@ class MyApp extends StatelessWidget {
         // PERFIL
         '/profile': (_) => ProfilePage(user: const {}),
       },
+    );
+  }
+}
+
+/// Pantalla de splash que verifica si hay sesión activa
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _checkSession();
+  }
+
+  Future<void> _checkSession() async {
+    // Esperar un poco para que la UI se renderice
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    if (!mounted) return;
+
+    // Verificar si hay sesión activa
+    final sessionService = SessionService();
+    final isActive = await sessionService.isSessionActive();
+
+    print('========================================');
+    print('🔍 VERIFICANDO SESIÓN AL INICIAR APP');
+    print('========================================');
+    print('Sesión activa: $isActive');
+    print('========================================');
+
+    if (isActive) {
+      // Sesión válida, restaurar y obtener datos del usuario
+      print('✅ Sesión válida, restaurando...');
+      final userData = await sessionService.restoreSession(() {
+        // Callback para cuando expire
+        _showSessionExpiredAndNavigateToLogin();
+      });
+      
+      if (userData != null && mounted) {
+        // Obtener el rol para saber a dónde navegar
+        final rol = userData["rol"].toString().toLowerCase();
+        String route = "/home";
+
+        if (rol == "administrador" || 
+            rol == "super admin" || 
+            rol == "superadmin" || 
+            rol == "super administrador") {
+          route = "/admin";
+        } else if (rol == "asistente") {
+          route = "/assistant";
+        }
+
+        print('✅ Navegando a: $route');
+        Navigator.pushReplacementNamed(context, route, arguments: userData);
+      } else if (mounted) {
+        print('❌ No se pudieron obtener datos del usuario');
+        Navigator.pushReplacementNamed(context, '/login');
+      }
+    } else {
+      // No hay sesión, ir a login
+      print('❌ No hay sesión activa, ir a login');
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/login');
+      }
+    }
+  }
+
+  void _showSessionExpiredAndNavigateToLogin() {
+    print('🔄 Sesión expirada durante app runtime');
+    if (mounted) {
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        '/login',
+        (route) => false,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.scaffoldBackground,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(25),
+              decoration: BoxDecoration(
+                color: AppColors.lightPurpleBackground,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.auto_awesome,
+                color: AppColors.primaryPurple,
+                size: 45,
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              "AstrhoApp",
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primaryPurple,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const CircularProgressIndicator(
+              color: AppColors.primaryPurple,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

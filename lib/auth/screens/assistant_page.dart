@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:astrhoapp/core/utils/colors.dart';
+import 'package:astrhoapp/core/widgets/custom_alert.dart';
 import 'package:astrhoapp/agenda/screens/mis_citas_screen.dart';
 import 'package:astrhoapp/services/screens/services_page.dart';
 import 'package:astrhoapp/auth/screens/profile_page.dart';
+import 'package:astrhoapp/core/services/session_service.dart';
 
 class AsistentePage extends StatefulWidget {
   final Map<dynamic, dynamic>? user;
@@ -174,35 +176,27 @@ class _AsistentePageState extends State<AsistentePage> {
   }
 
   void _showLogoutDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Cerrar Sesión'),
-          content: const Text('¿Estás seguro de que deseas cerrar sesión?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.pushNamedAndRemoveUntil(
-                  context,
-                  '/login',
-                  (route) => false,
-                );
-              },
-              child: const Text(
-                'Cerrar Sesión',
-                style: TextStyle(color: Colors.red),
-              ),
-            ),
-          ],
-        );
-      },
-    );
+    CustomAlert.showConfirmDialog(
+      context,
+      title: 'Cerrar Sesión',
+      message: '¿Estás seguro de que deseas cerrar sesión?',
+      confirmText: 'Cerrar Sesión',
+      cancelText: 'Cancelar',
+      isDangerous: true,
+    ).then((confirmed) async {
+      if (confirmed == true) {
+        // Cerrar sesión
+        await SessionService().closeSession();
+        
+        if (mounted) {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/login',
+            (route) => false,
+          );
+        }
+      }
+    });
   }
 
   Widget _bottomNav() {
@@ -234,6 +228,9 @@ class _AsistentePageState extends State<AsistentePage> {
     final isActive = _currentPageIndex == index;
     return GestureDetector(
       onTap: () {
+        // Renovar sesión en cada actividad del usuario
+        SessionService().renewSession();
+        
         setState(() {
           _currentPageIndex = index;
           _pageController.jumpToPage(index);
@@ -263,25 +260,48 @@ class _AsistentePageState extends State<AsistentePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.scaffoldBackground,
-      body: user == null
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primaryPurple))
-          : PageView(
-              controller: _pageController,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                _buildHomeScreen(),
-                const ServicesPage(showBottomNav: false),
-                MisCitasScreen(
-                  user: user,
-                  token: user?['token']?.toString(),
-                  showBottomNav: false,
-                ),
-                ProfilePage(user: user!),
-              ],
-            ),
-      bottomNavigationBar: _bottomNav(),
+    return WillPopScope(
+      onWillPop: () async {
+        print('========================================');
+        print('🔙 BOTÓN ATRÁS PRESIONADO (ASISTENTE)');
+        print('========================================');
+        print('Current Page Index: $_currentPageIndex');
+        
+        if (_currentPageIndex == 0) {
+          print('📍 Estamos en Home - Mostrando diálogo de logout');
+          // Estamos en la pantalla raíz, mostrar diálogo de logout
+          _showLogoutDialog();
+          return false; // No permitir pop
+        } else {
+          print('📍 Estamos en otra pantalla - Volviendo a Home');
+          // Volver a la pantalla anterior
+          setState(() {
+            _currentPageIndex = 0;
+            _pageController.jumpToPage(0);
+          });
+          return false; // No permitir pop, nosotros manejamos la navegación
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.scaffoldBackground,
+        body: user == null
+            ? const Center(child: CircularProgressIndicator(color: AppColors.primaryPurple))
+            : PageView(
+                controller: _pageController,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  _buildHomeScreen(),
+                  const ServicesPage(showBottomNav: false),
+                  MisCitasScreen(
+                    user: user,
+                    token: user?['token']?.toString(),
+                    showBottomNav: false,
+                  ),
+                  ProfilePage(user: user!),
+                ],
+              ),
+        bottomNavigationBar: _bottomNav(),
+      ),
     );
   }
 }

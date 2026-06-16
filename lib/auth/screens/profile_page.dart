@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../../agenda/models/agenda.dart';
 import 'package:astrhoapp/core/utils/colors.dart';
 import 'package:astrhoapp/core/widgets/custom_alert.dart';
+import 'package:astrhoapp/core/services/api_service.dart';
 
 class ProfilePage extends StatefulWidget {
   final Map<dynamic, dynamic> user;
@@ -43,6 +44,15 @@ class _ProfilePageState extends State<ProfilePage> {
   final TextEditingController _direccionController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _documentoController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
+  
+  bool _showPassword = false;
+  bool _showConfirmPassword = false;
+  
+  // Tipo de documento
+  String? _selectedDocumentType;
+  final List<String> _documentTypes = ['CC', 'CE', 'TI', 'NIT'];
 
   @override
   void initState() {
@@ -197,6 +207,11 @@ class _ProfilePageState extends State<ProfilePage> {
           _telefonoController.text = clienteData!.telefono ?? '';
           _direccionController.text = clienteData!.direccion ?? '';
           _documentoController.text = clienteData!.documentoCliente;
+          _selectedDocumentType = (clienteData!.tipoDocumento?.isNotEmpty == true 
+              && _documentTypes.contains(clienteData!.tipoDocumento)) 
+              ? clienteData!.tipoDocumento 
+              : 'CC';
+          print('Tipo de documento cargado: $_selectedDocumentType');
         }
       } else if (rol == 'empleado' ||
           rol == 'asistente' ||
@@ -273,6 +288,11 @@ class _ProfilePageState extends State<ProfilePage> {
           _telefonoController.text = empleadoData!.telefono ?? '';
           _direccionController.text = empleadoData!.direccion ?? '';
           _documentoController.text = empleadoData!.documentoEmpleado;
+          _selectedDocumentType = (empleadoData!.tipoDocumento?.isNotEmpty == true 
+              && _documentTypes.contains(empleadoData!.tipoDocumento)) 
+              ? empleadoData!.tipoDocumento 
+              : 'CC';
+          print('Tipo de documento cargado: $_selectedDocumentType');
           
           print('Valores cargados:');
           print('  - Nombre: ${_nombreController.text}');
@@ -312,6 +332,7 @@ class _ProfilePageState extends State<ProfilePage> {
         
         if (usuarioData != null) {
           _emailController.text = usuarioData!['email']?.toString() ?? '';
+          _documentoController.text = usuarioData!['documento']?.toString() ?? '';
         }
       }
       
@@ -343,6 +364,28 @@ class _ProfilePageState extends State<ProfilePage> {
       return;
     }
 
+    // Validar contraseñas si se proporcionaron
+    if (_passwordController.text.isNotEmpty || _confirmPasswordController.text.isNotEmpty) {
+      if (_passwordController.text.isEmpty) {
+        if (mounted) {
+          CustomAlert.showError(context, 'Debes ingresar la nueva contraseña');
+        }
+        return;
+      }
+      if (_confirmPasswordController.text.isEmpty) {
+        if (mounted) {
+          CustomAlert.showError(context, 'Debes confirmar la contraseña');
+        }
+        return;
+      }
+      if (_passwordController.text != _confirmPasswordController.text) {
+        if (mounted) {
+          CustomAlert.showError(context, 'Las contraseñas no coinciden');
+        }
+        return;
+      }
+    }
+
     setState(() {
       isLoading = true;
     });
@@ -357,13 +400,13 @@ class _ProfilePageState extends State<ProfilePage> {
       
       if (rol == 'cliente' && clienteData != null) {
         final updateClienteData = {
-          'documentoCliente': _documentoController.text,
+          'documentoCliente': clienteData!.documentoCliente, // Mantener PK sin cambios
           'nombre': _nombreController.text,
           'telefono': _telefonoController.text,
           'direccion': _direccionController.text,
           'dirección': _direccionController.text,
           'usuarioId': clienteData!.usuarioId,
-          'tipoDocumento': clienteData!.tipoDocumento,
+          'tipoDocumento': _selectedDocumentType ?? 'CC',
           'estado': clienteData!.estado,
         };
         print('Payload Cliente: $updateClienteData');
@@ -380,13 +423,13 @@ class _ProfilePageState extends State<ProfilePage> {
         }
       } else if (empleadoData != null) {
         final updateEmpleadoData = {
-          'documentoEmpleado': _documentoController.text,
+          'documentoEmpleado': empleadoData!.documentoEmpleado, // Mantener PK sin cambios
           'nombre': _nombreController.text,
           'telefono': _telefonoController.text,
           'direccion': _direccionController.text,
           'dirección': _direccionController.text,
           'usuarioId': empleadoData!.usuarioId,
-          'tipoDocumento': empleadoData!.tipoDocumento,
+          'tipoDocumento': _selectedDocumentType ?? 'CC',
           'estado': empleadoData!.estado,
         };
         print('Payload Empleado: $updateEmpleadoData');
@@ -403,8 +446,103 @@ class _ProfilePageState extends State<ProfilePage> {
         }
       }
 
+      // 2. Actualizar documento en Usuario si cambió
+      int? usuarioId;
+      if (usuarioData != null) {
+        usuarioId = int.tryParse(usuarioData!['idUsuario']?.toString() ?? '') ??
+                    int.tryParse(usuarioData!['usuarioId']?.toString() ?? '') ??
+                    int.tryParse(usuarioData!['id']?.toString() ?? '');
+      }
+
+      if (success && usuarioId != null && _documentoController.text.isNotEmpty) {
+        print('=== ACTUALIZANDO DOCUMENTO DE USUARIO ===');
+        print('usuarioId: $usuarioId');
+        print('Nuevo documento: ${_documentoController.text}');
+        
+        try {
+          // Obtener datos necesarios de usuarioData
+          print('usuarioData: $usuarioData');
+          final email = usuarioData!['email']?.toString() ?? '';
+          final rolId = usuarioData!['rolId'] ?? usuarioData!['rol_id'] ?? 2;
+          final estado = usuarioData!['estado'] ?? true;
+          
+          print('Email extraído: $email');
+          print('RolId extraído: $rolId');
+          print('Estado extraído: $estado');
+          
+          if (email.isNotEmpty) {
+            print('Creando ApiService con token...');
+            final apiService = ApiService(token: _authToken);
+            print('Token para API: $_authToken');
+            print('Llamando a updateUserDocument...');
+            
+            final documentoActualizado = await apiService.updateUserDocument(
+              usuarioId,
+              _documentoController.text,
+              email,
+              rolId is int ? rolId : (int.tryParse(rolId.toString()) ?? 2),
+              estado is bool ? estado : true,
+            );
+            
+            print('Resultado de updateUserDocument: $documentoActualizado');
+            
+            if (documentoActualizado) {
+              print('✅ Documento de usuario actualizado correctamente');
+            } else {
+              print('⚠️ No se pudo actualizar el documento de usuario');
+            }
+          } else {
+            print('⚠️ Email del usuario no disponible, no se actualiza documento');
+          }
+        } catch (e) {
+          print('⚠️ Error al actualizar documento: $e');
+          print('StackTrace: ${StackTrace.current}');
+        }
+      } else {
+        print('⚠️ No se actualizó documento - success: $success, usuarioId: $usuarioId, documentoText: ${_documentoController.text}');
+      }
+      if (success && _passwordController.text.isNotEmpty && _confirmPasswordController.text.isNotEmpty) {
+        print('=== CAMBIANDO CONTRASEÑA ===');
+        
+        // Obtener el usuario ID desde los datos cargados
+        int? usuarioId;
+        if (usuarioData != null) {
+          usuarioId = int.tryParse(usuarioData!['idUsuario']?.toString() ?? '') ??
+                      int.tryParse(usuarioData!['usuarioId']?.toString() ?? '') ??
+                      int.tryParse(usuarioData!['id']?.toString() ?? '');
+        }
+        
+        if (usuarioId != null) {
+          print('Usuario ID para cambio de contraseña: $usuarioId');
+          
+          final jsonData = {
+            'nuevaContrasena': _passwordController.text,
+            'confirmarContrasena': _confirmPasswordController.text,
+          };
+          print('Enviando cambio de contraseña: ${jsonEncode(jsonData)}');
+          
+          final response = await http.put(
+            Uri.parse('http://www.astrhoapp.somee.com/api/Usuarios/$usuarioId/contrasena'),
+            headers: _headers,
+            body: jsonEncode(jsonData),
+          );
+
+          print('Status cambio de contraseña: ${response.statusCode}');
+          print('Response cambio de contraseña: ${response.body}');
+
+          if (response.statusCode != 200 && response.statusCode != 204) {
+            success = false;
+            throw Exception('Error al cambiar contraseña: ${response.body}');
+          }
+        } else {
+          print('⚠️ No se pudo obtener el usuario ID para cambiar contraseña');
+        }
+      }
+
       if (success && mounted) {
         CustomAlert.showSuccess(context, 'Perfil actualizado correctamente');
+        _passwordController.clear();
+        _confirmPasswordController.clear();
         await _loadProfileData();
         setState(() {
           isEditing = false;
@@ -533,12 +671,58 @@ class _ProfilePageState extends State<ProfilePage> {
                             maxLength: 100,
                           ),
                           const SizedBox(height: 16),
+                          if (isEditing) ...[
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Tipo de Documento',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: AppColors.primaryPurple,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Container(
+                                  width: double.infinity,
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: AppColors.borderLight),
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  child: DropdownButton<String>(
+                                    value: _selectedDocumentType?.isNotEmpty == true 
+                                        ? (_documentTypes.contains(_selectedDocumentType) 
+                                            ? _selectedDocumentType 
+                                            : 'CC')
+                                        : 'CC',
+                                    isExpanded: true,
+                                    underline: const SizedBox(),
+                                    items: _documentTypes.map((type) {
+                                      return DropdownMenuItem(
+                                        value: type,
+                                        child: Text(type),
+                                      );
+                                    }).toList(),
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _selectedDocumentType = value;
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                          ],
                           _buildProfileField(
                             label: 'Documento',
                             controller: _documentoController,
                             icon: Icons.credit_card,
-                            enabled: false,
+                            enabled: isEditing,
                             maxLength: 15,
+                            prefix: isEditing ? null : (_selectedDocumentType ?? 'CC'),
                           ),
                           const SizedBox(height: 16),
                           _buildProfileField(
@@ -565,42 +749,68 @@ class _ProfilePageState extends State<ProfilePage> {
                             maxLength: 100,
                           ),
                           const SizedBox(height: 16),
+                          if (isEditing) ...[
+                            _buildProfileField(
+                              label: 'Nueva Contraseña',
+                              controller: _passwordController,
+                              icon: Icons.lock_outline,
+                              enabled: true,
+                              obscureText: !_showPassword,
+                              maxLength: 50,
+                            ),
+                            const SizedBox(height: 4),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _showPassword = !_showPassword;
+                                  });
+                                },
+                                child: Text(
+                                  _showPassword ? 'Ocultar' : 'Mostrar',
+                                  style: const TextStyle(
+                                    color: AppColors.primaryPurple,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            _buildProfileField(
+                              label: 'Confirmar Contraseña',
+                              controller: _confirmPasswordController,
+                              icon: Icons.lock_outline,
+                              enabled: true,
+                              obscureText: !_showConfirmPassword,
+                              maxLength: 50,
+                            ),
+                            const SizedBox(height: 4),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _showConfirmPassword = !_showConfirmPassword;
+                                  });
+                                },
+                                child: Text(
+                                  _showConfirmPassword ? 'Ocultar' : 'Mostrar',
+                                  style: const TextStyle(
+                                    color: AppColors.primaryPurple,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
                           _buildInfoCard(
                             'Rol',
                             widget.user['rolNombre'] ?? widget.user['rol'] ?? 'N/A',
                             Icons.security,
                           ),
                           const SizedBox(height: 24),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 56,
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primaryPurple,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                elevation: 0,
-                              ),
-                              onPressed: () {
-                                Navigator.pushNamed(
-                                  context,
-                                  '/forgot-password',
-                                  arguments: {'email': userEmail},
-                                );
-                              },
-                              icon: const Icon(Icons.lock_outline, color: AppColors.white),
-                              label: const Text(
-                                'Cambiar Contraseña',
-                                style: TextStyle(
-                                  color: AppColors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
                           if (isEditing) ...[
                             const SizedBox(height: 32),
                             Row(
@@ -682,6 +892,7 @@ class _ProfilePageState extends State<ProfilePage> {
     bool enabled = true,
     bool obscureText = false,
     int maxLength = 100,
+    String? prefix,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -709,6 +920,25 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(width: 12),
               Icon(icon, color: AppColors.textGray),
               const SizedBox(width: 10),
+              if (prefix != null && prefix.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Text(
+                    prefix,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textDark,
+                    ),
+                  ),
+                ),
+              if (prefix != null && prefix.isNotEmpty)
+                Container(
+                  width: 1,
+                  height: 20,
+                  color: AppColors.borderLight,
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
+                ),
               Expanded(
                 child: TextFormField(
                   controller: controller,

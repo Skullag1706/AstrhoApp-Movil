@@ -5,6 +5,7 @@ import 'appointment_flow_screen.dart';
 
 import 'package:astrhoapp/core/services/api_service.dart';
 import 'package:astrhoapp/core/utils/colors.dart';
+import 'package:astrhoapp/core/widgets/custom_alert.dart';
 
 class AgendaDetailScreen extends StatefulWidget {
   final Agenda agenda;
@@ -30,6 +31,7 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
   Cliente? _currentUserClient;
   bool _isLoadingPrices = true;
   bool _isLoading = false;
+  bool _showingSuccessDialog = false;
   late Agenda _currentAgenda;
 
   @override
@@ -118,6 +120,25 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
       decimalDigits: 0,
     );
     return currencyFormatter.format(amount);
+  }
+
+  // Parsear una hora en formato String (ej: "14:30:00") a DateTime
+  DateTime _parseTime(String timeString) {
+    try {
+      final parts = timeString.split(':');
+      final hour = int.parse(parts[0]);
+      final minute = parts.length > 1 ? int.parse(parts[1]) : 0;
+      return DateTime(2000, 1, 1, hour, minute);
+    } catch (e) {
+      print('Error parseando hora "$timeString": $e');
+      return DateTime(2000, 1, 1, 0, 0);
+    }
+  }
+
+  // Formatear DateTime para mostrar al usuario
+  String _formatDateTimeForDisplay(DateTime dateTime) {
+    final formatter = DateFormat('dd/MM/yyyy HH:mm', 'es_CO');
+    return formatter.format(dateTime);
   }
 
   String _getClientName(String documento) {
@@ -235,125 +256,335 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
 
   // Métodos para cambiar el estado
   Future<void> _confirmarCita() async {
+    print('========================================');
+    print('👤 USUARIO PRESIONA CONFIRMAR CITA');
+    print('========================================');
+    print('agendaId: ${_currentAgenda.agendaId}');
+    print('nombreEstado actual: ${_currentAgenda.nombreEstado}');
+    
     if (_currentAgenda.agendaId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se puede identificar la cita')),
-      );
+      print('❌ agendaId es null');
+      CustomAlert.showError(context, 'No se puede identificar la cita');
       return;
     }
+    
+    print('✅ agendaId válido: ${_currentAgenda.agendaId}');
+    
+    // Mostrar diálogo de confirmación personalizado
+    final confirmacion = await CustomAlert.showConfirmDialog(
+      context,
+      title: 'Confirmar Cita',
+      message: '¿Deseas confirmar esta cita? Una vez confirmada, será visible para el cliente.',
+      confirmText: 'Sí, Confirmar',
+      cancelText: 'Cancelar',
+      isDangerous: false,
+    );
+
+    if (confirmacion != true) {
+      print('❌ Usuario canceló la confirmación');
+      return;
+    }
+
+    print('⚠️ Usuario confirmó - Ejecutando confirmarCita()...');
     
     setState(() {
       _isLoading = true;
     });
     try {
+      print('📞 Llamando a _apiService.confirmarCita()...');
       final agendaActualizada = await _apiService.confirmarCita(_currentAgenda.agendaId!);
+      print('✅ Respuesta recibida: ${agendaActualizada.nombreEstado}');
       if (mounted) {
         setState(() {
           _currentAgenda = agendaActualizada;
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cita confirmada exitosamente')),
-        );
+        
+        // Mostrar pantalla de éxito
+        _showStatusChangeSuccessScreen('Confirmado', 'Cita confirmada exitosamente');
       }
     } catch (e) {
+      print('❌ Error en _confirmarCita: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        CustomAlert.showError(context, 'Error al confirmar: $e');
       }
     }
+    print('========================================');
   }
 
   Future<void> _completarCita() async {
+    print('========================================');
+    print('👤 USUARIO PRESIONA COMPLETAR CITA');
+    print('========================================');
+    print('agendaId: ${_currentAgenda.agendaId}');
+    print('nombreEstado actual: ${_currentAgenda.nombreEstado}');
+    
     if (_currentAgenda.agendaId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se puede identificar la cita')),
+      print('❌ agendaId es null');
+      CustomAlert.showError(context, 'No se puede identificar la cita');
+      return;
+    }
+
+    print('✅ agendaId válido: ${_currentAgenda.agendaId}');
+    
+    // Verificar si la cita aún no ha pasado
+    final fechaHoraActual = DateTime.now();
+    final fechaCita = _currentAgenda.fechaCita;
+    final horaCita = _parseTime(_currentAgenda.horaInicio);
+    
+    final fechaHoraCita = DateTime(
+      fechaCita.year,
+      fechaCita.month,
+      fechaCita.day,
+      horaCita.hour,
+      horaCita.minute,
+    );
+    
+    print('Fecha/Hora actual: $fechaHoraActual');
+    print('Fecha/Hora cita: $fechaHoraCita');
+    print('¿La cita ya pasó? ${fechaHoraActual.isAfter(fechaHoraCita)}');
+    
+    if (fechaHoraActual.isBefore(fechaHoraCita)) {
+      print('❌ Cita aún no ha pasado, no se puede completar');
+      CustomAlert.showError(
+        context, 
+        'No se puede completar una cita que aún no ha comenzado.\n\nFecha y hora de la cita: ${_formatDateTimeForDisplay(fechaHoraCita)}',
       );
       return;
     }
+    
+    print('✅ La cita ya ha pasado, se puede completar');
+    
+    // Mostrar diálogo de confirmación personalizado
+    final confirmacion = await CustomAlert.showConfirmDialog(
+      context,
+      title: 'Completar Cita',
+      message: '¿Deseas marcar esta cita como completada?',
+      confirmText: 'Sí, Completar',
+      cancelText: 'Cancelar',
+      isDangerous: false,
+    );
+
+    if (confirmacion != true) {
+      print('❌ Usuario canceló la completación');
+      return;
+    }
+
+    print('⚠️ Usuario confirmó - Ejecutando completarCita()...');
     
     setState(() {
       _isLoading = true;
     });
     try {
+      print('📞 Llamando a _apiService.completarCita()...');
       final agendaActualizada = await _apiService.completarCita(_currentAgenda.agendaId!);
+      print('✅ Respuesta recibida: ${agendaActualizada.nombreEstado}');
       if (mounted) {
         setState(() {
           _currentAgenda = agendaActualizada;
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cita completada exitosamente')),
-        );
+        
+        // Mostrar pantalla de éxito
+        _showStatusChangeSuccessScreen('Completado', 'Cita completada exitosamente');
       }
     } catch (e) {
+      print('❌ Error en _completarCita: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        CustomAlert.showError(context, 'Error al completar: $e');
       }
     }
+    print('========================================');
   }
 
   Future<void> _cancelarCita() async {
+    print('========================================');
+    print('👤 USUARIO PRESIONA CANCELAR CITA');
+    print('========================================');
+    print('agendaId: ${_currentAgenda.agendaId}');
+    
     if (_currentAgenda.agendaId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se puede identificar la cita')),
-      );
+      print('❌ agendaId es null');
+      CustomAlert.showError(context, 'No se puede identificar la cita');
       return;
     }
     
-    final confirmacion = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cancelar Cita'),
-        content: const Text('¿Estás seguro de que quieres cancelar esta cita?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('No'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Sí'),
-          ),
-        ],
-      ),
+    print('✅ agendaId válido: ${_currentAgenda.agendaId}');
+    
+    // Mostrar diálogo de confirmación personalizado (marcado como peligroso)
+    final confirmacion = await CustomAlert.showConfirmDialog(
+      context,
+      title: 'Cancelar Cita',
+      message: '¿Estás seguro de que deseas cancelar esta cita? Esta acción no se puede deshacer.',
+      confirmText: 'Sí, Cancelar Cita',
+      cancelText: 'No, Mantener',
+      isDangerous: true,
     );
 
-    if (confirmacion == true) {
-      setState(() {
-        _isLoading = true;
-      });
-      try {
-        final agendaActualizada = await _apiService.cancelarCita(_currentAgenda.agendaId!);
-        if (mounted) {
-          setState(() {
-            _currentAgenda = agendaActualizada;
-            _isLoading = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Cita cancelada exitosamente')),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e')),
-          );
-        }
+    if (confirmacion != true) {
+      print('❌ Usuario canceló la cancelación');
+      return;
+    }
+
+    print('⚠️ Usuario confirmó - Ejecutando cancelarCita()...');
+    
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      print('📞 Llamando a _apiService.cancelarCita()...');
+      final agendaActualizada = await _apiService.cancelarCita(_currentAgenda.agendaId!);
+      print('✅ Respuesta recibida: ${agendaActualizada.nombreEstado}');
+      
+      if (mounted) {
+        setState(() {
+          _currentAgenda = agendaActualizada;
+          _isLoading = false;
+        });
+        
+        // Mostrar pantalla de éxito
+        _showStatusChangeSuccessScreen('Cancelado', 'Cita cancelada exitosamente');
+      }
+    } catch (e) {
+      print('❌ Error en _cancelarCita: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        CustomAlert.showError(context, 'Error al cancelar: $e');
       }
     }
+    print('========================================');
+  }
+  
+  // Mostrar pantalla de éxito al cambiar estado
+  void _showStatusChangeSuccessScreen(String nuevoEstado, String mensaje) {
+    setState(() {
+      _showingSuccessDialog = true;
+    });
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withOpacity(0.3), // Fondo semi-transparente
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Icono de éxito
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEAD8FF),
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: const Icon(
+                        Icons.check_circle_outline,
+                        size: 70,
+                        color: Color(0xFF7926F7),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF7926F7),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.check, color: Colors.white, size: 24),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 28),
+                
+                // Título
+                Text(
+                  "¡$nuevoEstado!",
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                
+                // Mensaje
+                Text(
+                  mensaje,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                
+                // Botón cerrar
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF7926F7),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 0,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _showingSuccessDialog = false;
+                      });
+                      Navigator.pop(context); // Cerrar diálogo
+                      Navigator.pop(context, _currentAgenda); // Volver a mis citas con agenda actualizada
+                    },
+                    child: const Text(
+                      'Entendido',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    ).then((_) {
+      // Asegurar que la bandera se resetea cuando el diálogo se cierra
+      if (mounted) {
+        setState(() {
+          _showingSuccessDialog = false;
+        });
+      }
+    });
   }
 
   // Método para reprogramar cita
@@ -608,8 +839,8 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
                   
                   const SizedBox(height: 24),
                   
-                  // Botones de acción
-                  if (!_estaCancelado && !_estaCompletado) ...[
+                  // Botones de acción (ocultos mientras se muestra el diálogo de éxito)
+                  if (!_showingSuccessDialog && !_estaCancelado && !_estaCompletado) ...[
                     if (!_isCliente && _estaPendiente) ...[
                       SizedBox(
                         width: double.infinity,
@@ -633,7 +864,7 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
                       ),
                       const SizedBox(height: 12),
                     ],
-                    if ((_estaPendiente || _estaConfirmado) && !_isCliente) ...[
+                    if (_estaConfirmado && !_isCliente) ...[
                       SizedBox(
                         width: double.infinity,
                         height: 50,

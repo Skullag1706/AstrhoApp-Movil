@@ -494,50 +494,66 @@ class ServiceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: kCardBg,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.07),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildImage(),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    service.nombre,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: kTextDark,
-                      height: 1.2,
+    return GestureDetector(
+      onTap: () => _openServiceDetail(context),
+      child: Container(
+        decoration: BoxDecoration(
+          color: kCardBg,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.07),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildImage(),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      service.nombre,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: kTextDark,
+                        height: 1.2,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 5),
-                  _buildCategoryChip(),
-                  const SizedBox(height: 6),
-                  _buildDurationPrice(),
-                  const Spacer(),
-                  _buildButtons(context),
-                ],
+                    const SizedBox(height: 5),
+                    if (service.descripcion != null && service.descripcion!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 5),
+                        child: Text(
+                          service.descripcion!,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: kTextGrey,
+                            height: 1.2,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    _buildCategoryChip(),
+                    const SizedBox(height: 6),
+                    _buildDurationPrice(),
+                    const Spacer(),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -554,7 +570,7 @@ class ServiceCard extends StatelessWidget {
               gradient: LinearGradient(
                 colors: [
                   _getColorForService(service.nombre),
-                  _getColorForService(service.nombre).withOpacity(0.7),
+                  _getColorForService(service.nombre).withValues(alpha: 0.7),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -572,7 +588,7 @@ class ServiceCard extends StatelessWidget {
                     height: 80,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.1),
+                      color: Colors.white.withValues(alpha: 0.1),
                     ),
                   ),
                 ),
@@ -584,7 +600,7 @@ class ServiceCard extends StatelessWidget {
                     height: 50,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.08),
+                      color: Colors.white.withValues(alpha: 0.08),
                     ),
                   ),
                 ),
@@ -592,7 +608,7 @@ class ServiceCard extends StatelessWidget {
                   child: Icon(
                     _getIconForService(service.nombre),
                     size: 42,
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                   ),
                 ),
               ],
@@ -654,7 +670,7 @@ class ServiceCard extends StatelessWidget {
           ],
         ),
         Text(
-          '\$${_formatPrice(service.precio)}',
+          '\$${service.precio.toInt().toString()}',
           style: const TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w800,
@@ -665,52 +681,11 @@ class ServiceCard extends StatelessWidget {
     );
   }
 
-  Widget _buildButtons(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: () => _showServiceDetails(context),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              side: const BorderSide(color: kPrimary, width: 1.2),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              foregroundColor: kPrimary,
-            ),
-            icon: const Icon(Icons.remove_red_eye_outlined, size: 13),
-            label: const Text(
-              'Ver Más',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ),
-        const SizedBox(width: 6),
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: () => _scheduleService(context),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              backgroundColor: kAccent,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            icon: const Icon(Icons.calendar_today_outlined, size: 13),
-            label: const Text(
-              'Agendar',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ),
-      ],
-    );
+  void _scheduleService(BuildContext context) {
+    Navigator.pushNamed(context, '/appointment-flow');
   }
 
-  void _showServiceDetails(BuildContext context) {
+  void _openServiceDetail(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -738,7 +713,7 @@ class ServiceCard extends StatelessWidget {
                     gradient: LinearGradient(
                       colors: [
                         _getColorForService(service.nombre),
-                        _getColorForService(service.nombre).withOpacity(0.7),
+                        _getColorForService(service.nombre).withValues(alpha: 0.7),
                       ],
                     ),
                   ),
@@ -746,7 +721,7 @@ class ServiceCard extends StatelessWidget {
                     child: Icon(
                       _getIconForService(service.nombre),
                       size: 80,
-                      color: Colors.white.withOpacity(0.8),
+                      color: Colors.white.withValues(alpha: 0.8),
                     ),
                   ),
                 ),
@@ -771,7 +746,7 @@ class ServiceCard extends StatelessWidget {
                 children: [
                   const Icon(Icons.attach_money, size: 20, color: kPrimary),
                   const SizedBox(width: 8),
-                  Text('Precio: \$${_formatPrice(service.precio)}', style: const TextStyle(fontSize: 14)),
+                  Text('Precio: \$${service.precio.toInt().toString()}', style: const TextStyle(fontSize: 14)),
                 ],
               ),
             ],
@@ -798,14 +773,6 @@ class ServiceCard extends StatelessWidget {
     );
   }
 
-  void _scheduleService(BuildContext context) {
-    Navigator.pushNamed(
-      context,
-      '/appointment-flow',
-      arguments: {'selectedService': service},
-    );
-  }
-
   Color _getColorForService(String serviceName) {
     final name = serviceName.toLowerCase();
     if (name.contains('corte')) return const Color(0xFFAD1457);
@@ -829,12 +796,5 @@ class ServiceCard extends StatelessWidget {
     if (name.contains('pedicure')) return Icons.self_improvement;
     if (name.contains('tintura')) return Icons.colorize;
     return Icons.star;
-  }
-
-  String _formatPrice(double price) {
-    return price.toInt().toString().replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (Match m) => '${m[1]}.',
-    );
   }
 }

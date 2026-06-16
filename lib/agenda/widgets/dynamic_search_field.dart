@@ -49,22 +49,8 @@ class _DynamicSearchFieldState<T> extends State<DynamicSearchField<T>> {
     super.initState();
     _searchController = TextEditingController();
     _selectedValue = widget.initialValue;
-    _searchController.addListener(_onSearchChanged);
+    // NO agregar listener aquí - usar onChanged en el TextField en su lugar
     _focusNode.addListener(_onFocusChanged);
-  }
-
-  void _onSearchChanged() {
-    if (_searchController.text.isEmpty) {
-      _debounceTimer?.cancel();
-      setState(() {
-        _searchResults = [];
-      });
-    } else {
-      _debounceTimer?.cancel();
-      _debounceTimer = Timer(Duration(milliseconds: widget.debounceMs), () {
-        _performSearch(_searchController.text);
-      });
-    }
   }
 
   void _onFocusChanged() {
@@ -81,6 +67,26 @@ class _DynamicSearchFieldState<T> extends State<DynamicSearchField<T>> {
     }
   }
 
+  void _onSearchChanged(String value) {
+    // Cancelar timer anterior
+    _debounceTimer?.cancel();
+
+    if (value.isEmpty) {
+      // Si está vacío, limpiar resultados inmediatamente
+      if (mounted) {
+        setState(() {
+          _selectedValue = null;
+          _searchResults = [];
+        });
+      }
+    } else if (_focusNode.hasFocus) {
+      // Debounce: esperar antes de realizar búsqueda
+      _debounceTimer = Timer(Duration(milliseconds: widget.debounceMs), () {
+        _performSearch(value);
+      });
+    }
+  }
+
   Future<void> _performSearch(String query) async {
     if (!mounted) return;
 
@@ -91,15 +97,12 @@ class _DynamicSearchFieldState<T> extends State<DynamicSearchField<T>> {
       if (mounted) {
         setState(() {
           _searchResults = results;
+          _isLoading = false;
         });
         _showOverlay();
       }
     } catch (e) {
       print('Error en búsqueda dinámica: $e');
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -244,17 +247,7 @@ class _DynamicSearchFieldState<T> extends State<DynamicSearchField<T>> {
           contentPadding:
               const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
         ),
-        onChanged: (value) {
-          if (value.isEmpty) {
-            setState(() {
-              _selectedValue = null;
-              _searchResults = [];
-            });
-          } else if (_focusNode.hasFocus) {
-            // Trigger búsqueda automática si hay focus
-            _performSearch(value);
-          }
-        },
+        onChanged: _onSearchChanged,
       ),
     );
   }

@@ -54,6 +54,8 @@ class RegistrationService {
     required String email,
     required String password,
     required String confirmPassword,
+    String? documento,
+    String? tipoDocumento,
   }) async {
     developer.log('👤 Registrando usuario: $email');
 
@@ -68,6 +70,16 @@ class RegistrationService {
         "contrasena": password.trim(),
         "confirmarContrasena": confirmPassword.trim(),
       };
+
+      // Agregar documento y tipoDocumento si se proporcionan
+      if (documento != null && documento.isNotEmpty) {
+        body["documento"] = documento;
+        developer.log('📝 Documento agregado: $documento');
+      }
+      if (tipoDocumento != null && tipoDocumento.isNotEmpty) {
+        body["tipoDocumento"] = tipoDocumento;
+        developer.log('📝 Tipo de documento agregado: $tipoDocumento');
+      }
 
       developer.log('📦 Body: ${jsonEncode(body)}');
 
@@ -91,7 +103,7 @@ class RegistrationService {
         } catch (e) {
           developer.log('⚠️ No se pudo parsear respuesta, pero status es 200/201');
           // Retornar los datos del usuario que enviamos
-          return {"email": email, "rolId": 2};
+          return {"email": email, "rolId": 2, "documento": documento};
         }
       } else {
         throw Exception(

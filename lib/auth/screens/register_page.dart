@@ -23,7 +23,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final telefonoCtrl = TextEditingController();
   final direccionCtrl = TextEditingController();
   String? tipoDocumento;
-  final List<String> tipoDocumentoOptions = ['CC', 'CE', 'TI', 'TE'];
+  final List<String> tipoDocumentoOptions = ['CC', 'CE', 'TI', 'NIT'];
 
   bool showPass = false;
   bool showConfirmPass = false;
@@ -42,10 +42,8 @@ class _RegisterPageState extends State<RegisterPage> {
   String? direccionError;
 
   String? validateDireccion(String? value) {
-    if (value == null || value.isEmpty) {
-      return "Obligatorio";
-    }
-    if (value.length < 5) {
+    // La dirección es opcional, así que no retornamos error si está vacía
+    if (value != null && value.isNotEmpty && value.length < 5) {
       return "Mín 5 caracteres";
     }
     return null;
@@ -147,8 +145,7 @@ class _RegisterPageState extends State<RegisterPage> {
         documentoError != null ||
         nombreClienteError != null ||
         telefonoError != null ||
-        tipoDocumentoError != null ||
-        direccionError != null) {
+        tipoDocumentoError != null) {
       developer.log('❌ Validación fallida: hay errores en los campos');
       showError("Corrige los errores antes de continuar");
       return;
@@ -179,6 +176,8 @@ class _RegisterPageState extends State<RegisterPage> {
         email: emailController.text.trim(),
         password: passController.text.trim(),
         confirmPassword: confirmPassController.text.trim(),
+        documento: documentoCtrl.text.trim(),
+        tipoDocumento: tipoDocumento,
       );
 
       developer.log('✅ Usuario registrado');
@@ -532,15 +531,58 @@ class _RegisterPageState extends State<RegisterPage> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          _buildLabel("Documento Cliente", documentoError),
+                          _buildLabel("Documento", documentoError),
                           const SizedBox(height: 8),
-                          inputBox(
-                            controller: documentoCtrl,
-                            icon: Icons.credit_card,
-                            hint: "Ingresa tu documento",
-                            onChanged: (value) => setState(() => documentoError = validateDocumento(value)),
-                            isError: documentoError != null,
-                            maxLength: 15,
+                          Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.scaffoldBackground,
+                              border: Border.all(
+                                color: documentoError != null ? Colors.red : AppColors.borderLight,
+                                width: 1,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Row(
+                              children: [
+                                const SizedBox(width: 12),
+                                const Icon(Icons.credit_card, color: AppColors.textGray),
+                                const SizedBox(width: 10),
+                                if (tipoDocumento != null && tipoDocumento!.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: Text(
+                                      tipoDocumento!,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textDark,
+                                      ),
+                                    ),
+                                  ),
+                                if (tipoDocumento != null && tipoDocumento!.isNotEmpty)
+                                  Container(
+                                    width: 1,
+                                    height: 20,
+                                    color: AppColors.borderLight,
+                                    margin: const EdgeInsets.symmetric(horizontal: 8),
+                                  ),
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: documentoCtrl,
+                                    inputFormatters: [
+                                      LengthLimitingTextInputFormatter(15),
+                                    ],
+                                    decoration: InputDecoration(
+                                      hintText: "Ingresa tu documento",
+                                      hintStyle: const TextStyle(color: AppColors.textGray),
+                                      border: InputBorder.none,
+                                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                                    ),
+                                    onChanged: (value) => setState(() => documentoError = validateDocumento(value)),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                           const SizedBox(height: 16),
                           _buildLabel("Nombre", nombreClienteError),
@@ -565,7 +607,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             maxLength: 10,
                           ),
                           const SizedBox(height: 16),
-                          _buildLabel("Dirección", direccionError),
+                          _buildLabel("Dirección", direccionError, isRequired: false),
                           const SizedBox(height: 8),
                           inputBox(
                             controller: direccionCtrl,
@@ -621,7 +663,7 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  Widget _buildLabel(String text, String? error) {
+  Widget _buildLabel(String text, String? error, {bool isRequired = true}) {
     return Row(
       children: [
         Text(
@@ -632,6 +674,15 @@ class _RegisterPageState extends State<RegisterPage> {
             color: AppColors.textDark,
           ),
         ),
+        if (isRequired)
+          const Text(
+            " *",
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              color: Colors.red,
+            ),
+          ),
         if (error != null) ...[
           const SizedBox(width: 10),
           Text(

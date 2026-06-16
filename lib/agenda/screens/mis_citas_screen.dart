@@ -205,7 +205,7 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
                 child: Column(
                   children: [
                     Text(
-                      'MAY',
+                      DateFormat('MMM', 'es_ES').format(agenda.fechaCita).toUpperCase(),
                       style: TextStyle(
                         color: AppColors.primaryPurple,
                         fontSize: 10,
@@ -643,7 +643,13 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
         builder: (context) =>
             AgendaDetailScreen(agenda: agenda, token: token, user: user),
       ),
-    );
+    ).then((result) {
+      // Si se retorna una agenda actualizada, recargar la lista
+      if (result != null && result is Agenda) {
+        print('📋 Cita actualizada, recargando listado...');
+        _loadAgendas(); // Recargar citas desde el servidor
+      }
+    });
   }
 
   List<Agenda> get _currentAgendas {

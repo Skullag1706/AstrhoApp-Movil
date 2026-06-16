@@ -6,6 +6,7 @@ import 'package:astrhoapp/agenda/screens/mis_citas_screen.dart';
 // SERVICES
 import 'package:astrhoapp/services/screens/services_page.dart';
 import 'package:astrhoapp/auth/screens/profile_page.dart';
+import 'package:astrhoapp/core/services/session_service.dart';
 
 class HomePage extends StatefulWidget {
   final Map<dynamic, dynamic>? user;
@@ -22,6 +23,7 @@ class _HomePageState extends State<HomePage> {
   int _currentPageIndex = 0;
   final PageController _pageController = PageController(initialPage: 0);
   bool _isInitialized = false;
+  int _misCitasRefreshKey = 0;
 
   @override
   void didChangeDependencies() {
@@ -112,8 +114,8 @@ class _HomePageState extends State<HomePage> {
                         width: double.infinity,
                         height: 56,
                         child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(
+                          onPressed: () async {
+                            final result = await Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (context) => AppointmentFlowScreen(
@@ -122,6 +124,16 @@ class _HomePageState extends State<HomePage> {
                                 ),
                               ),
                             );
+                            
+                            // Si se agendó exitosamente (result == true), navegar a mis citas
+                            if (result == true && mounted) {
+                              // Incrementar key para forzar reconstrucción de MisCitasScreen
+                              setState(() {
+                                _misCitasRefreshKey++;
+                                _currentPageIndex = 2; // Índice de mis citas
+                              });
+                              _pageController.jumpToPage(2);
+                            }
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primaryPurple,
@@ -189,13 +201,18 @@ class _HomePageState extends State<HomePage> {
       confirmText: 'Cerrar Sesión',
       cancelText: 'Cancelar',
       isDangerous: true,
-    ).then((confirmed) {
+    ).then((confirmed) async {
       if (confirmed == true) {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/login',
-          (route) => false,
-        );
+        // Cerrar sesión
+        await SessionService().closeSession();
+        
+        if (mounted) {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/login',
+            (route) => false,
+          );
+        }
       }
     });
   }
@@ -229,6 +246,9 @@ class _HomePageState extends State<HomePage> {
     final isActive = _currentPageIndex == index;
     return GestureDetector(
       onTap: () {
+        // Renovar sesión en cada actividad del usuario
+        SessionService().renewSession();
+        
         setState(() {
           _currentPageIndex = index;
           _pageController.jumpToPage(index);
@@ -258,25 +278,49 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.scaffoldBackground,
-      body: user == null
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primaryPurple))
-          : PageView(
-              controller: _pageController,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                _buildHomeScreen(),
-                const ServicesPage(showBottomNav: false),
-                MisCitasScreen(
-                  user: user,
-                  token: user?['token']?.toString(),
-                  showBottomNav: false,
-                ),
-                ProfilePage(user: user!),
-              ],
-            ),
-      bottomNavigationBar: _bottomNav(),
+    return WillPopScope(
+      onWillPop: () async {
+        print('========================================');
+        print('🔙 BOTÓN ATRÁS PRESIONADO');
+        print('========================================');
+        print('Current Page Index: $_currentPageIndex');
+        
+        if (_currentPageIndex == 0) {
+          print('📍 Estamos en Home - Mostrando diálogo de logout');
+          // Estamos en la pantalla raíz, mostrar diálogo de logout
+          _showLogoutDialog();
+          return false; // No permitir pop
+        } else {
+          print('📍 Estamos en otra pantalla - Volviendo a Home');
+          // Volver a la pantalla anterior
+          setState(() {
+            _currentPageIndex = 0;
+            _pageController.jumpToPage(0);
+          });
+          return false; // No permitir pop, nosotros manejamos la navegación
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.scaffoldBackground,
+        body: user == null
+            ? const Center(child: CircularProgressIndicator(color: AppColors.primaryPurple))
+            : PageView(
+                controller: _pageController,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  _buildHomeScreen(),
+                  const ServicesPage(showBottomNav: false),
+                  MisCitasScreen(
+                    key: ValueKey(_misCitasRefreshKey),
+                    user: user,
+                    token: user?['token']?.toString(),
+                    showBottomNav: false,
+                  ),
+                  ProfilePage(user: user!),
+                ],
+              ),
+        bottomNavigationBar: _bottomNav(),
+      ),
     );
   }
 }

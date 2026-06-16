@@ -76,7 +76,12 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     } catch (e) {
       setState(() => loading = false);
       if (mounted) {
-        CustomAlert.showError(context, "Error de conexión: $e");
+        // Limpiar el mensaje de error para no mostrar códigos internos
+        String errorMessage = "Error de conexión";
+        if (e.toString().contains('500') || e.toString().contains('502')) {
+          errorMessage = "Este servicio no se encuentra disponible actualmente";
+        }
+        CustomAlert.showError(context, errorMessage);
       }
     }
   }
