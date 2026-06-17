@@ -215,7 +215,7 @@ class RegistrationService {
         "tipoDocumento": tipoDocumento,
         "nombre": nombre,
         "telefono": telefono,
-        "direccion": direccion,
+        "dirección": direccion,
         "estado": true,
       };
 

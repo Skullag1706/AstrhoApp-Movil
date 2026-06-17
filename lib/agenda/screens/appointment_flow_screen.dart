@@ -72,18 +72,12 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
   Map<String, bool> empleadosConHoras = {};
 
   // Pagination variables
-  final int _itemsPerPage = 5;
-  int _currentClientePage = 1;
-  int _totalClientePages = 1;
+  final int _itemsPerPage = 6;
   int _currentServicePage = 1;
   int _totalServicePages = 1;
-  int _currentEmpleadoPage = 1;
-  int _totalEmpleadoPages = 1;
 
   // Displayed items for pagination
-  List<Cliente> _displayedClientes = [];
   List<Servicio> _displayedServicios = [];
-  List<Empleado> _displayedEmpleados = [];
   
   // Search filters
   String _servicioSearchQuery = '';
@@ -174,9 +168,12 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
       print('========================================');
 
       // Initialize pagination
-      _updatePaginationForClientes();
-      _updatePaginationForServicios();
-      _updatePaginationForEmpleados();
+      if (mounted) {
+        setState(() {
+          _updatePaginationForClientes();
+          _updatePaginationForEmpleados();
+        });
+      }
 
       // Si hay una cita para editar, prellenar los datos
       if (widget.agendaToEdit != null) {
@@ -298,14 +295,37 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
 
   // Pagination helper methods
   void _updatePaginationForClientes() {
-    // Inicializar lista filtrada si está vacía
-    if (_clientesFiltered.isEmpty) {
-      _clientesFiltered = List.from(clientes);
-    }
-    _totalClientePages = (clientes.length / _itemsPerPage).ceil();
-    if (_totalClientePages == 0) _totalClientePages = 1;
-    _currentClientePage = 1;
-    _updateDisplayedClientes();
+    // Filtrar clientes: solo activos y con rol de cliente en su usuario
+    final clientesFiltrados = clientes
+        .where((c) {
+          // 1. Solo mostrar clientes activos
+          if (c.estado != true) {
+            print('❌ Cliente ${c.nombre} inactivo, no se muestra');
+            return false;
+          }
+          
+          // 2. Filtrar por rol del usuario asociado
+          // Si el cliente tiene usuarioId, verificar que sea cliente o que el usuario actual sea admin
+          if (isAdmin) {
+            // Admins ven todos los clientes activos
+            return true;
+          } else if (isCliente) {
+            // Clientes solo ven a sí mismos
+            if (widget.user?["usuarioId"] != null && c.usuarioId == widget.user?["usuarioId"]) {
+              return true;
+            }
+            return false;
+          } else {
+            // Otros roles pueden ver clientes
+            return true;
+          }
+        })
+        .toList();
+    
+    print('👥 Clientes filtrados: ${clientesFiltrados.length} de ${clientes.length}');
+    
+    // Inicializar lista filtrada con los clientes que pasen el filtro
+    _clientesFiltered = List.from(clientesFiltrados);
     
     // También inicializar páginas filtradas
     _totalClienteFilteredPages = (_clientesFiltered.length / _itemsPerPage).ceil();
@@ -315,52 +335,60 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
   }
 
   void _updatePaginationForServicios() {
-    // Inicializar lista filtrada si está vacía
+    // Inicializar lista filtrada con todos los servicios disponibles
     if (_serviciosFiltered.isEmpty) {
       _serviciosFiltered = List.from(serviciosDisponibles);
     }
-    _totalServicePages = (_serviciosFiltered.length / _itemsPerPage).ceil();
-    if (_totalServicePages == 0) _totalServicePages = 1;
+    // En el formulario de agendamiento, no usamos paginación
+    // Solo mostramos todos los servicios en un scroll
+    _totalServicePages = 1;
     _currentServicePage = 1;
     _updateDisplayedServiciosFiltered();
   }
 
   void _updatePaginationForEmpleados() {
-    // Filtrar solo empleados que tienen horarios registrados
-    // Si empleadosConHoras está vacío, mostrar todos (aún se están cargando)
-    final empleadosConHorasDisponibles = empleados
+    // Filtrar empleados: solo activos
+    // Las horas se cargan de forma asincrónica y se ocultan los que NO tienen después
+    final empleadosActivos = empleados
         .where((e) {
-          // Si no tenemos información sobre este empleado, incluirlo por defecto
-          if (!empleadosConHoras.containsKey(e.documentoEmpleado)) {
+          // 1. Solo mostrar empleados activos
+          if (e.estado != true) {
+            print('❌ Empleado ${e.nombre} inactivo, no se muestra');
+            return false;
+          }
+          
+          // 2. Filtrar por rol del usuario asociado
+          if (isAdmin) {
+            // Admins ven todos los empleados activos
+            return true;
+          } else if (isAsistente) {
+            // Asistentes solo ven a sí mismos
+            if (widget.user?["usuarioId"] != null && e.usuarioId == widget.user?["usuarioId"]) {
+              return true;
+            }
+            return false;
+          } else if (isCliente) {
+            // Clientes ven todos los empleados activos
+            return true;
+          } else {
+            // Otros roles ven empleados activos
             return true;
           }
-          // Si tenemos información, solo incluir si tiene horas
-          return empleadosConHoras[e.documentoEmpleado] == true;
         })
         .toList();
     
-    print('Empleados para mostrar: ${empleadosConHorasDisponibles.length} de ${empleados.length}');
+    print('👤 Empleados activos: ${empleadosActivos.length} de ${empleados.length}');
+    print('   Empleados con horas confirmadas: ${empleadosConHoras.values.where((v) => v == true).length}');
+    print('   Empleados sin horas confirmadas: ${empleadosConHoras.values.where((v) => v == false).length}');
     
-    // Inicializar lista filtrada si está vacía
-    if (_empleadosFiltered.isEmpty) {
-      _empleadosFiltered = List.from(empleadosConHorasDisponibles);
-    }
-    _totalEmpleadoPages = (empleadosConHorasDisponibles.length / _itemsPerPage).ceil();
-    if (_totalEmpleadoPages == 0) _totalEmpleadoPages = 1;
-    _currentEmpleadoPage = 1;
-    _updateDisplayedEmpleados();
+    // Inicializar lista filtrada con todos los empleados activos
+    _empleadosFiltered = List.from(empleadosActivos);
     
     // También inicializar páginas filtradas
     _totalEmpleadoFilteredPages = (_empleadosFiltered.length / _itemsPerPage).ceil();
     if (_totalEmpleadoFilteredPages == 0) _totalEmpleadoFilteredPages = 1;
     _currentEmpleadoFilteredPage = 1;
     _updateDisplayedEmpleadosFiltered();
-  }
-
-  void _updateDisplayedClientes() {
-    final start = (_currentClientePage - 1) * _itemsPerPage;
-    final end = (start + _itemsPerPage).clamp(0, clientes.length);
-    _displayedClientes = clientes.sublist(start, end);
   }
 
   void _filterServicios(String query) {
@@ -389,24 +417,41 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
     _displayedServicios = _serviciosFiltered.sublist(start, end);
   }
 
-  void _updateDisplayedEmpleados() {
-    final start = (_currentEmpleadoPage - 1) * _itemsPerPage;
-    final end = (start + _itemsPerPage).clamp(0, empleados.length);
-    _displayedEmpleados = empleados.sublist(start, end);
-  }
-
   void _filterClientes(String query) {
     setState(() {
       _clienteSearchQuery = query.toLowerCase();
-      if (_clienteSearchQuery.isEmpty) {
-        _clientesFiltered = List.from(clientes);
-      } else {
-        _clientesFiltered = clientes
+      
+      // Filtrar por búsqueda
+      List<Cliente> resultado = clientes;
+      
+      if (_clienteSearchQuery.isNotEmpty) {
+        resultado = clientes
             .where((c) =>
                 c.nombre.toLowerCase().contains(_clienteSearchQuery) ||
                 c.documentoCliente.toLowerCase().contains(_clienteSearchQuery))
             .toList();
       }
+      
+      // Filtrar por estado y rol
+      _clientesFiltered = resultado
+          .where((c) {
+            // 1. Solo mostrar clientes activos
+            if (c.estado != true) {
+              return false;
+            }
+            
+            // 2. Filtrar por rol del usuario asociado
+            if (isAdmin) {
+              return true;
+            } else if (isCliente) {
+              // Clientes solo ven a sí mismos
+              return widget.user?["usuarioId"] != null && c.usuarioId == widget.user?["usuarioId"];
+            } else {
+              return true;
+            }
+          })
+          .toList();
+      
       _currentClienteFilteredPage = 1;
       _totalClienteFilteredPages = (_clientesFiltered.length / _itemsPerPage).ceil();
       if (_totalClienteFilteredPages == 0) _totalClienteFilteredPages = 1;
@@ -439,8 +484,10 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
           empleadosConHoras[empleado.documentoEmpleado] = tieneHoras;
           print('✓ ${empleado.nombre} (${empleado.documentoEmpleado}): ${tieneHoras ? 'Tiene horas ✓' : 'Sin horas ✗'}');
         } catch (e) {
-          print('Error cargando horarios de ${empleado.nombre}: $e');
-          // Por defecto, mostrar el empleado si hay error al cargar horarios
+          print('⚠️ Error cargando horarios de ${empleado.nombre}: $e');
+          // Si hay error, asumir que tiene horas (para no bloquear)
+          // El usuario podrá seleccionarlo, y si no tiene horarios disponibles,
+          // se mostrará un mensaje al intentar cargar horarios específicos
           empleadosConHoras[empleado.documentoEmpleado] = true;
         }
       }
@@ -448,22 +495,10 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
       print('✅ Horarios cargados. Total empleados: ${empleados.length}, Con horas: ${empleadosConHoras.values.where((v) => v).length}');
     } catch (e) {
       print('Error en _loadEmpleadosHorariosInfo: $e');
-      // Si hay error general, marcar todos como con horas para no bloquear
+      // Si hay error general, asumir que todos tienen horas para no bloquear
       for (final empleado in empleados) {
         empleadosConHoras[empleado.documentoEmpleado] = true;
       }
-    }
-  }
-
-  // Verificar si un empleado tiene horas disponibles
-  Future<bool> _empleadoTieneHoras(Empleado empleado) async {
-    try {
-      final horarios = await _apiService.getHorariosEmpleado(empleado.documentoEmpleado);
-      // Si tiene horarios registrados, tiene horas disponibles
-      return horarios.isNotEmpty && horarios.any((h) => h.estado);
-    } catch (e) {
-      print('Error verificando horarios de ${empleado.nombre}: $e');
-      return true; // Por defecto, mostrar el empleado si hay error
     }
   }
 
@@ -482,16 +517,31 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
             .toList();
       }
       
-      // Filtrar solo empleados que tienen horas disponibles
-      // Si no tenemos información sobre horarios, incluir al empleado por defecto
+      // Filtrar por estado y rol (sin filtro de horarios)
       _empleadosFiltered = resultado
           .where((e) {
-            // Si no tenemos información, incluirlo
-            if (!empleadosConHoras.containsKey(e.documentoEmpleado)) {
+            // 1. Solo mostrar empleados activos
+            if (e.estado != true) {
+              return false;
+            }
+            
+            // 2. Filtrar por rol del usuario asociado
+            if (isAdmin) {
+              // Admins ven todos los empleados activos
+              return true;
+            } else if (isAsistente) {
+              // Asistentes solo ven a sí mismos
+              if (widget.user?["usuarioId"] != null && e.usuarioId == widget.user?["usuarioId"]) {
+                return true;
+              }
+              return false;
+            } else if (isCliente) {
+              // Clientes ven todos los empleados activos
+              return true;
+            } else {
+              // Otros roles ven empleados activos
               return true;
             }
-            // Si tenemos información, solo si tiene horas
-            return empleadosConHoras[e.documentoEmpleado] == true;
           })
           .toList();
       
@@ -508,29 +558,11 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
     _displayedEmpleadosFiltered = _empleadosFiltered.sublist(start, end);
   }
 
-  void _changeClientePage(int newPage) {
-    if (newPage != _currentClientePage && newPage >= 1 && newPage <= _totalClientePages) {
-      setState(() {
-        _currentClientePage = newPage;
-        _updateDisplayedClientes();
-      });
-    }
-  }
-
   void _changeServicePage(int newPage) {
     if (newPage != _currentServicePage && newPage >= 1 && newPage <= _totalServicePages) {
       setState(() {
         _currentServicePage = newPage;
         _updateDisplayedServiciosFiltered();
-      });
-    }
-  }
-
-  void _changeEmpleadoPage(int newPage) {
-    if (newPage != _currentEmpleadoPage && newPage >= 1 && newPage <= _totalEmpleadoPages) {
-      setState(() {
-        _currentEmpleadoPage = newPage;
-        _updateDisplayedEmpleados();
       });
     }
   }

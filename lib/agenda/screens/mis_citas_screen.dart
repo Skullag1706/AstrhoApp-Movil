@@ -457,7 +457,9 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
       final rol = user != null ? user!["rol"]?.toString().toLowerCase() : "";
       final agendas = rol == 'cliente'
           ? await _apiService!.getMisCitas()
-          : await _apiService!.getAgendas();
+          : rol == 'empleado' || rol == 'asistente'
+              ? await _apiService!.getMisCitasEmpleado()
+              : await _apiService!.getAgendas();
 
       // Load servicios for each agenda
       final agendasWithServicios = await Future.wait(

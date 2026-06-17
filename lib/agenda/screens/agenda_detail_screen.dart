@@ -612,6 +612,7 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
 
   // Verificar rol
   bool get _isCliente => widget.user != null && widget.user!['rol']?.toString().toLowerCase() == 'cliente';
+  bool get _isAsistente => widget.user != null && (widget.user!['rol']?.toString().toLowerCase() == 'asistente' || widget.user!['rol']?.toString().toLowerCase() == 'empleado');
 
   // Verificar estados
   bool get _estaPendiente => _currentAgenda.nombreEstado?.toLowerCase().contains('pendiente') == true;
@@ -864,7 +865,7 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
                       ),
                       const SizedBox(height: 12),
                     ],
-                    if (_estaConfirmado && !_isCliente) ...[
+                    if (_estaConfirmado && !_isCliente && !_isAsistente) ...[
                       SizedBox(
                         width: double.infinity,
                         height: 50,
@@ -912,28 +913,30 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
                       ),
                       const SizedBox(height: 12),
                     ],
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: AppColors.statusCancelled),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                    if (!_isAsistente) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppColors.statusCancelled),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
-                        ),
-                        onPressed: _isLoading ? null : _cancelarCita,
-                        child: _isLoading
-                            ? const CircularProgressIndicator(color: AppColors.statusCancelled)
-                            : const Text(
-                                'Cancelar Cita',
-                                style: TextStyle(
-                                  color: AppColors.statusCancelled,
-                                  fontWeight: FontWeight.bold,
+                          onPressed: _isLoading ? null : _cancelarCita,
+                          child: _isLoading
+                              ? const CircularProgressIndicator(color: AppColors.statusCancelled)
+                              : const Text(
+                                  'Cancelar Cita',
+                                  style: TextStyle(
+                                    color: AppColors.statusCancelled,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              ),
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                   const SizedBox(height: 20),
                 ],

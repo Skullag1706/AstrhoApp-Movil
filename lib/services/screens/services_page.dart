@@ -28,7 +28,7 @@ class ServicesPage extends StatefulWidget {
 class _ServicesPageState extends State<ServicesPage> {
   int currentPage = 1;
   int totalPages = 1;
-  final int servicesPerPage = 5;
+  final int servicesPerPage = 6;
 
   List<Servicio> displayedServices = [];
   bool isLoading = true;
@@ -67,22 +67,23 @@ class _ServicesPageState extends State<ServicesPage> {
     });
 
     try {
-      final result = await apiService!.getServicios(
+      final result = await apiService!.getServiciosTodos(
         pagina: page,
         busqueda: _searchQuery.isNotEmpty ? _searchQuery : null,
+        pageSize: servicesPerPage,  // Pasar el tamaño de página
       );
       
       if (!mounted) return;
 
       setState(() {
         displayedServices = (result['servicios'] as List<Servicio>)
-            .where((service) => service.estado)
+            .where((service) => service.estado == true)
             .toList();
         
         totalPages = result['totalPaginas'] as int;
         currentPage = page;
         
-        print('Página $currentPage de $totalPages: ${displayedServices.length} servicios');
+        print('📄 Página $currentPage de $totalPages: ${displayedServices.length} servicios mostrados');
         isLoading = false;
       });
     } catch (e) {
@@ -92,7 +93,7 @@ class _ServicesPageState extends State<ServicesPage> {
         errorMessage = 'Error al cargar servicios: $e';
         isLoading = false;
       });
-      print('Error cargando servicios: $e');
+      print('❌ Error cargando servicios: $e');
     }
   }
 

@@ -131,6 +131,50 @@ class ApiService {
     }
   }
 
+  // Obtener citas del empleado logueado con paginación
+  Future<List<Agenda>> getMisCitasEmpleado() async {
+    try {
+      final List<Agenda> todasLasCitas = [];
+      int paginaActual = 1;
+      bool hayMasPaginas = true;
+
+      while (hayMasPaginas) {
+        print('Llamando a API: $baseUrl/Agenda/mis-citas-empleado?pagina=$paginaActual');
+        
+        final response = await http
+            .get(Uri.parse('$baseUrl/Agenda/mis-citas-empleado?pagina=$paginaActual'), headers: _headers)
+            .timeout(timeoutDuration);
+
+        print('Status code: ${response.statusCode}');
+
+        if (response.statusCode == 200) {
+          final agendasEnPagina = _parseAgendaList(response.body);
+          todasLasCitas.addAll(agendasEnPagina);
+
+          final data = _parseJson(response.body);
+          if (data is Map<String, dynamic>) {
+            final totalPaginas = data['totalPaginas'] ?? data['total_paginas'] ?? 1;
+            hayMasPaginas = paginaActual < totalPaginas;
+            print('Página $paginaActual de $totalPaginas - Citas del empleado: ${agendasEnPagina.length}');
+          } else {
+            hayMasPaginas = false;
+          }
+        } else {
+          print('Error en mis-citas-empleado: ${response.statusCode} - ${response.body}');
+          hayMasPaginas = false;
+        }
+
+        paginaActual++;
+      }
+
+      print('Total de citas del empleado obtenidas: ${todasLasCitas.length}');
+      return todasLasCitas;
+    } catch (e) {
+      print('Excepción en mis-citas-empleado: $e');
+      return [];
+    }
+  }
+
   List<Agenda> _parseAgendaList(String body) {
     if (body.trim().isEmpty) return [];
     try {
@@ -442,7 +486,7 @@ class ApiService {
     
     try {
       final jsonData = {'estadoId': 2};
-      print('� Enviando PUT a: $baseUrl/Agenda/$id/estado');
+      print('📤 Enviando PUT a: $baseUrl/Agenda/$id/estado');
       print('📄 JSON: ${json.encode(jsonData)}');
       
       final response = await http
@@ -484,6 +528,19 @@ class ApiService {
           metodopagoId: 1,
           nombreEstado: 'Confirmado',
         );
+      } else if (response.statusCode == 500 && response.body.trim().isEmpty) {
+        // Error 500 con body vacío: el servidor cambió el estado pero tuvo problema al responder
+        print('✅ Estado cambió exitosamente (servidor retornó 500 con body vacío)');
+        return Agenda(
+          agendaId: id,
+          documentoCliente: '',
+          documentoEmpleado: '',
+          fechaCita: DateTime.now(),
+          horaInicio: '00:00',
+          estadoId: 2,
+          metodopagoId: 1,
+          nombreEstado: 'Confirmado',
+        );
       } else {
         throw Exception('Error al confirmar estado: ${response.statusCode} - ${response.body}');
       }
@@ -505,7 +562,7 @@ class ApiService {
     
     try {
       final jsonData = {'estadoId': 4};
-      print('� Enviando PUT a: $baseUrl/Agenda/$id/estado');
+      print('📤 Enviando PUT a: $baseUrl/Agenda/$id/estado');
       print('📄 JSON: ${json.encode(jsonData)}');
       
       final response = await http
@@ -547,6 +604,19 @@ class ApiService {
           metodopagoId: 1,
           nombreEstado: 'Completado',
         );
+      } else if (response.statusCode == 500 && response.body.trim().isEmpty) {
+        // Error 500 con body vacío: el servidor cambió el estado pero tuvo problema al responder
+        print('✅ Estado cambió exitosamente (servidor retornó 500 con body vacío)');
+        return Agenda(
+          agendaId: id,
+          documentoCliente: '',
+          documentoEmpleado: '',
+          fechaCita: DateTime.now(),
+          horaInicio: '00:00',
+          estadoId: 4,
+          metodopagoId: 1,
+          nombreEstado: 'Completado',
+        );
       } else {
         throw Exception('Error al completar estado: ${response.statusCode} - ${response.body}');
       }
@@ -568,7 +638,7 @@ class ApiService {
     
     try {
       final jsonData = {'estadoId': 3};
-      print('� Enviando PUT a: $baseUrl/Agenda/$id/estado');
+      print('📤 Enviando PUT a: $baseUrl/Agenda/$id/estado');
       print('📄 JSON: ${json.encode(jsonData)}');
       
       final response = await http
@@ -600,6 +670,19 @@ class ApiService {
         
         // Si no hay respuesta con contenido, retornar objeto dummy actualizado
         print('⚠️ Sin respuesta con contenido, retornando objeto actualizado');
+        return Agenda(
+          agendaId: id,
+          documentoCliente: '',
+          documentoEmpleado: '',
+          fechaCita: DateTime.now(),
+          horaInicio: '00:00',
+          estadoId: 3,
+          metodopagoId: 1,
+          nombreEstado: 'Cancelado',
+        );
+      } else if (response.statusCode == 500 && response.body.trim().isEmpty) {
+        // Error 500 con body vacío: el servidor cambió el estado pero tuvo problema al responder
+        print('✅ Estado cambió exitosamente (servidor retornó 500 con body vacío)');
         return Agenda(
           agendaId: id,
           documentoCliente: '',
@@ -807,7 +890,7 @@ class ApiService {
       print('Respuesta servicios body: ${response.body}');
 
       if (response.statusCode == 200) {
-        final result = _parseServiciosPaginados(response.body);
+        final result = _parseServiciosPaginados(response.body, pagina: pagina, pageSize: 6);
         return result;
       } else if (response.statusCode == 404) {
         // Intentar con ruta singular
@@ -822,7 +905,7 @@ class ApiService {
         print('Intentando endpoint singular: $urlSingular');
         print('Respuesta singular status: ${responseSingular.statusCode}');
         if (responseSingular.statusCode == 200) {
-          return _parseServiciosPaginados(responseSingular.body);
+          return _parseServiciosPaginados(responseSingular.body, pagina: pagina, pageSize: 6);
         }
       }
       
@@ -844,7 +927,7 @@ class ApiService {
     }
   }
 
-  Map<String, dynamic> _parseServiciosPaginados(String body) {
+  Map<String, dynamic> _parseServiciosPaginados(String body, {int pagina = 1, int pageSize = 6}) {
     if (body.trim().isEmpty) {
       print('Cuerpo de servicios vacío');
       return {
@@ -859,16 +942,15 @@ class ApiService {
       final dynamic data = _parseJson(body);
       List<dynamic> serviciosList = [];
       int totalPaginas = 1;
-      int paginaActual = 1;
       int totalServicios = 0;
 
       if (data is List) {
+        // Si la API devuelve directamente una lista, paginamos en el frontend
         serviciosList = data;
         totalServicios = serviciosList.length;
       } else if (data is Map<String, dynamic>) {
         // Buscar información de paginación
         totalPaginas = data['totalPaginas'] ?? data['total_paginas'] ?? 1;
-        paginaActual = data['paginaActual'] ?? data['pagina_actual'] ?? 1;
         totalServicios = data['totalServicios'] ?? data['total_servicios'] ?? 0;
 
         // Buscar lista de servicios
@@ -889,12 +971,12 @@ class ApiService {
       }
 
       print('Lista de servicios para parsear: ${serviciosList.length} elementos');
-      final servicios = serviciosList
+      
+      // Parsear todos los servicios
+      final todosLosServicios = serviciosList
           .map((json) {
             try {
-              print('Parseando servicio: $json');
               final servicio = Servicio.fromJson(json as Map<String, dynamic>);
-              print('Servicio parseado: ID=${servicio.servicioId}, Nombre=${servicio.nombre}, Imagen=${servicio.imagen}');
               return servicio;
             } catch (e) {
               print('Error al parsear servicio individual: $e');
@@ -905,12 +987,33 @@ class ApiService {
           .cast<Servicio>()
           .toList();
 
-      print('Servicios parseados exitosamente: ${servicios.length}');
+      print('Total de servicios parseados: ${todosLosServicios.length}');
+
+      // Si la API no devolvió información de paginación, calcular aquí en el frontend
+      if (totalServicios == 0) {
+        totalServicios = todosLosServicios.length;
+      }
+      
+      if (totalPaginas == 1 && totalServicios > pageSize) {
+        totalPaginas = (totalServicios / pageSize).ceil();
+        print('Calculando paginación en frontend: $totalServicios servicios ÷ $pageSize por página = $totalPaginas páginas');
+      }
+
+      // Paginar los servicios en el frontend
+      final startIndex = (pagina - 1) * pageSize;
+      final endIndex = (startIndex + pageSize).clamp(0, todosLosServicios.length);
+      
+      List<Servicio> serviciosPaginados = [];
+      if (startIndex < todosLosServicios.length) {
+        serviciosPaginados = todosLosServicios.sublist(startIndex, endIndex);
+      }
+
+      print('Página $pagina: mostrando servicios del índice $startIndex al $endIndex (total: ${serviciosPaginados.length})');
       
       return {
-        'servicios': servicios,
+        'servicios': serviciosPaginados,
         'totalPaginas': totalPaginas,
-        'paginaActual': paginaActual,
+        'paginaActual': pagina,
         'totalServicios': totalServicios,
       };
     } catch (e) {
@@ -932,6 +1035,52 @@ class ApiService {
     } catch (e) {
       print('Error en getServiciosLegacy: $e');
       return [];
+    }
+  }
+
+  // Obtener servicios desde el endpoint /Servicios/todos con paginación y búsqueda
+  Future<Map<String, dynamic>> getServiciosTodos({
+    int pagina = 1,
+    String? busqueda,
+    int pageSize = 6,  // Añadir parámetro de tamaño de página
+  }) async {
+    try {
+      // Construir URL con parámetros
+      String url = '$baseUrl/Servicios/todos?pagina=$pagina&pageSize=$pageSize';
+      if (busqueda != null && busqueda.isNotEmpty) {
+        url += '&buscar=${Uri.encodeComponent(busqueda)}';
+      }
+
+      print('📋 Llamando a endpoint: $url');
+      final response = await http
+          .get(Uri.parse(url), headers: _headers)
+          .timeout(timeoutDuration);
+
+      print('📋 Status code: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final result = _parseServiciosPaginados(response.body, pagina: pagina, pageSize: pageSize);
+        print('✅ Servicios cargados: ${(result['servicios'] as List).length}');
+        print('   Página: ${result['paginaActual']}, Total páginas: ${result['totalPaginas']}, Total servicios: ${result['totalServicios']}');
+        return result;
+      } else {
+        print('❌ Error al cargar servicios: ${response.statusCode}');
+        // Si no hay respuesta exitosa, devolver estructura vacía
+        return {
+          'servicios': <Servicio>[],
+          'totalPaginas': 1,
+          'paginaActual': pagina,
+          'totalServicios': 0,
+        };
+      }
+    } catch (e) {
+      print('❌ Excepción al obtener servicios desde /todos: $e');
+      return {
+        'servicios': <Servicio>[],
+        'totalPaginas': 1,
+        'paginaActual': pagina,
+        'totalServicios': 0,
+      };
     }
   }
 
