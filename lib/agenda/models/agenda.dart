@@ -381,6 +381,7 @@ class Empleado {
   final bool? estado;
   final int? usuarioId;
   final String? direccion;
+  final bool? agendable;
 
   Empleado({
     required this.documentoEmpleado,
@@ -391,6 +392,7 @@ class Empleado {
     this.estado,
     this.usuarioId,
     this.direccion,
+    this.agendable,
   });
 
   factory Empleado.fromJson(Map<String, dynamic> json) {
@@ -425,6 +427,15 @@ class Empleado {
       return null;
     }
 
+    // Parsear agendable desde múltiples formas
+    bool? parseAgendable() {
+      final agendableValue = json['agendable'] ?? json['es_agendable'] ?? json['esAgendable'];
+      if (agendableValue is bool) return agendableValue;
+      if (agendableValue is int) return agendableValue == 1;
+      if (agendableValue is String) return agendableValue.toLowerCase() == 'true' || agendableValue == '1';
+      return null;
+    }
+
     return Empleado(
       documentoEmpleado: docEmpleado.isNotEmpty ? docEmpleado : nombreEmpleado,
       nombre: nombreEmpleado.isNotEmpty ? nombreEmpleado : docEmpleado,
@@ -441,6 +452,7 @@ class Empleado {
           json['dirección']?.toString() ??
           json['direccion']?.toString() ??
           json['dirección_empleado']?.toString(),
+      agendable: parseAgendable(),
     );
   }
 }

@@ -39,6 +39,26 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
     super.initState();
     _apiService = ApiService(token: widget.token);
     _currentAgenda = widget.agenda;
+    _loadAgendaAndInitialData();
+  }
+
+  Future<void> _loadAgendaAndInitialData() async {
+    // Primero recargar la cita desde el servidor para asegurar que está actualizada
+    if (_currentAgenda.agendaId != null) {
+      try {
+        print('📥 Recargando datos de la cita desde el servidor...');
+        final updatedAgenda = await _apiService.getAgendaById(_currentAgenda.agendaId!);
+        if (mounted) {
+          setState(() {
+            _currentAgenda = updatedAgenda;
+          });
+        }
+      } catch (e) {
+        print('⚠️ Error al recargar cita: $e');
+      }
+    }
+    
+    // Luego cargar el resto de datos
     _loadInitialData();
   }
 
@@ -599,13 +619,11 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
         ),
       ),
     ).then((result) {
-      if (result != null && result is Agenda) {
-        setState(() {
-          _currentAgenda = result;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cita reprogramada exitosamente')),
-        );
+      // Cuando regresa de AppointmentFlowScreen
+      if (result == 'refresh') {
+        print('📋 Reprogramación completada, cerrando para recargar...');
+        // Retornar 'refresh_and_close' para indicar que debe recargar y cerrar
+        Navigator.pop(context, 'refresh_and_close');
       }
     });
   }

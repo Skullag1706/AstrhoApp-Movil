@@ -14,7 +14,6 @@ class RegisterPage extends StatefulWidget {
 
 class _RegisterPageState extends State<RegisterPage> {
   final emailController = TextEditingController();
-  final confirmEmailController = TextEditingController();
   final passController = TextEditingController();
   final confirmPassController = TextEditingController();
 
@@ -30,7 +29,6 @@ class _RegisterPageState extends State<RegisterPage> {
   bool isLoading = false;
 
   String? emailError;
-  String? confirmEmailError;
   String? passError;
   String? confirmPassError;
   String? emailExistsError;
@@ -56,16 +54,6 @@ class _RegisterPageState extends State<RegisterPage> {
     final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
     if (!emailRegex.hasMatch(value)) {
       return "Correo inválido";
-    }
-    return null;
-  }
-
-  String? validateConfirmEmail(String? value) {
-    if (value == null || value.isEmpty) {
-      return "Obligatorio";
-    }
-    if (value != emailController.text) {
-      return "No coinciden";
     }
     return null;
   }
@@ -126,7 +114,6 @@ class _RegisterPageState extends State<RegisterPage> {
     
     setState(() {
       emailError = validateEmail(emailController.text);
-      confirmEmailError = validateConfirmEmail(confirmEmailController.text);
       passError = validatePass(passController.text);
       confirmPassError = validateConfirmPass(confirmPassController.text);
       documentoError = validateDocumento(documentoCtrl.text);
@@ -139,7 +126,6 @@ class _RegisterPageState extends State<RegisterPage> {
     developer.log('📋 Validación de campos completada');
 
     if (emailError != null ||
-        confirmEmailError != null ||
         passError != null ||
         confirmPassError != null ||
         documentoError != null ||
@@ -425,61 +411,6 @@ class _RegisterPageState extends State<RegisterPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildLabel("Correo", emailError ?? emailExistsError),
-                          const SizedBox(height: 8),
-                          inputBox(
-                            controller: emailController,
-                            icon: Icons.alternate_email,
-                            hint: "Ingresa tu correo",
-                            onChanged: (value) {
-                              setState(() => emailError = validateEmail(value));
-                              checkEmailExists(value);
-                            },
-                            isError: emailError != null || emailExistsError != null,
-                            maxLength: 100,
-                          ),
-                          const SizedBox(height: 16),
-                          _buildLabel("Confirmar correo", confirmEmailError),
-                          const SizedBox(height: 8),
-                          inputBox(
-                            controller: confirmEmailController,
-                            icon: Icons.alternate_email,
-                            hint: "Confirma tu correo",
-                            onChanged: (value) => setState(() => confirmEmailError = validateConfirmEmail(value)),
-                            isError: confirmEmailError != null,
-                            maxLength: 100,
-                          ),
-                          const SizedBox(height: 16),
-                          _buildLabel("Contraseña", passError),
-                          const SizedBox(height: 8),
-                          inputBox(
-                            controller: passController,
-                            icon: Icons.lock_outline,
-                            hint: "Ingresa tu contraseña",
-                            isPassword: true,
-                            showPassword: showPass,
-                            onToggle: () => setState(() => showPass = !showPass),
-                            onChanged: (value) => setState(() => passError = validatePass(value)),
-                            isError: passError != null,
-                            maxLength: 15,
-                          ),
-                          const SizedBox(height: 16),
-                          _buildLabel("Confirmar contraseña", confirmPassError),
-                          const SizedBox(height: 8),
-                          inputBox(
-                            controller: confirmPassController,
-                            icon: Icons.lock_outline,
-                            hint: "Confirma tu contraseña",
-                            isPassword: true,
-                            showPassword: showConfirmPass,
-                            onToggle: () => setState(() => showConfirmPass = !showConfirmPass),
-                            onChanged: (value) => setState(() => confirmPassError = validateConfirmPass(value)),
-                            isError: confirmPassError != null,
-                            maxLength: 15,
-                          ),
-                          const SizedBox(height: 24),
-                          const Divider(color: AppColors.borderLight),
-                          const SizedBox(height: 20),
                           const Text(
                             "Datos Personales",
                             style: TextStyle(
@@ -507,7 +438,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: DropdownButtonFormField<String>(
-                                    value: tipoDocumento,
+                                    initialValue: tipoDocumento,
                                     hint: const Text("Selecciona tipo", style: TextStyle(color: AppColors.textGray)),
                                     items: tipoDocumentoOptions.map((String value) {
                                       return DropdownMenuItem<String>(
@@ -616,6 +547,59 @@ class _RegisterPageState extends State<RegisterPage> {
                             onChanged: (value) => setState(() => direccionError = validateDireccion(value)),
                             isError: direccionError != null,
                             maxLength: 100,
+                          ),
+                          const SizedBox(height: 24),
+                          const Divider(color: AppColors.borderLight),
+                          const SizedBox(height: 20),
+                          const Text(
+                            "Datos de Usuario",
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primaryPurple,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          _buildLabel("Correo", emailError ?? emailExistsError),
+                          const SizedBox(height: 8),
+                          inputBox(
+                            controller: emailController,
+                            icon: Icons.alternate_email,
+                            hint: "Ingresa tu correo",
+                            onChanged: (value) {
+                              setState(() => emailError = validateEmail(value));
+                              checkEmailExists(value);
+                            },
+                            isError: emailError != null || emailExistsError != null,
+                            maxLength: 100,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildLabel("Contraseña", passError),
+                          const SizedBox(height: 8),
+                          inputBox(
+                            controller: passController,
+                            icon: Icons.lock_outline,
+                            hint: "Ingresa tu contraseña",
+                            isPassword: true,
+                            showPassword: showPass,
+                            onToggle: () => setState(() => showPass = !showPass),
+                            onChanged: (value) => setState(() => passError = validatePass(value)),
+                            isError: passError != null,
+                            maxLength: 15,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildLabel("Confirmar contraseña", confirmPassError),
+                          const SizedBox(height: 8),
+                          inputBox(
+                            controller: confirmPassController,
+                            icon: Icons.lock_outline,
+                            hint: "Confirma tu contraseña",
+                            isPassword: true,
+                            showPassword: showConfirmPass,
+                            onToggle: () => setState(() => showConfirmPass = !showConfirmPass),
+                            onChanged: (value) => setState(() => confirmPassError = validateConfirmPass(value)),
+                            isError: confirmPassError != null,
+                            maxLength: 15,
                           ),
                           const SizedBox(height: 28),
                           SizedBox(

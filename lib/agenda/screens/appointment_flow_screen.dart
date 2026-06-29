@@ -149,7 +149,17 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
       // Cargar datos en paralelo
       final futures = <Future>[];
       futures.add(_apiService.getClientes().then((data) => clientes = data));
-      futures.add(_apiService.getEmpleados().then((data) => empleados = data));
+      futures.add(_apiService.getEmpleados().then((data) {
+        empleados = data;
+        // Log para ver si agendable viene del servidor
+        print('========================================');
+        print('EMPLEADOS CARGADOS:');
+        for (int i = 0; i < empleados.length; i++) {
+          final e = empleados[i];
+          print('  - Empleado $i: Nombre=${e.nombre}, agendable=${e.agendable}, estado=${e.estado}');
+        }
+        print('========================================');
+      }));
       // Load ALL services from all pages (API has 5 records per page)
       futures.add(_loadAllServicios());
       futures.add(_apiService.getMetodosPago().then((data) => metodosPago = data));
@@ -157,7 +167,30 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
       // Cargar horarios de TODOS los empleados para verificar cuáles tienen horas
       futures.add(_loadEmpleadosHorariosInfo());
 
-      await Future.wait(futures);
+      // Esperar a que se carguen los horarios de forma sincrónica
+      // NO usar await Future.wait() para todo, porque eso permite que _updatePaginationForEmpleados se ejecute
+      // antes de que los horarios estén listos
+      
+      // Primero cargar datos rápidos
+      await Future.wait([
+        _apiService.getClientes().then((data) => clientes = data),
+        _apiService.getEmpleados().then((data) {
+          empleados = data;
+          // Log para ver si agendable viene del servidor
+          print('========================================');
+          print('EMPLEADOS CARGADOS:');
+          for (int i = 0; i < empleados.length; i++) {
+            final e = empleados[i];
+            print('  - Empleado $i: Nombre=${e.nombre}, agendable=${e.agendable}, estado=${e.estado}');
+          }
+          print('========================================');
+        }),
+        _loadAllServicios(),
+        _apiService.getMetodosPago().then((data) => metodosPago = data),
+      ]);
+      
+      // Cargar horarios de forma sincrónica ANTES de actualizar paginación
+      await _loadEmpleadosHorariosInfo();
       
       print('========================================');
       print('SERVICIOS DISPONIBLES CARGADOS:');
@@ -167,11 +200,12 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
       }
       print('========================================');
 
-      // Initialize pagination
+      // Initialize pagination DESPUÉS de que los horarios estén completamente cargados
       if (mounted) {
         setState(() {
           _updatePaginationForClientes();
           _updatePaginationForEmpleados();
+          _updatePaginationForServicios();
         });
       }
 
@@ -347,44 +381,49 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
   }
 
   void _updatePaginationForEmpleados() {
-    // Filtrar empleados: solo activos
-    // Las horas se cargan de forma asincrónica y se ocultan los que NO tienen después
+    // Filtrar empleados: solo activos y agendables
+    print('========================================');
+    print('FILTRANDO EMPLEADOS:');
+    print('Total empleados: ${empleados.length}');
+    
     final empleadosActivos = empleados
         .where((e) {
-          // 1. Solo mostrar empleados activos
+          print('  - ${e.nombre}: estado=${e.estado}, agendable=${e.agendable}');
+          
+          // Solo mostrar empleados activos
           if (e.estado != true) {
-            print('❌ Empleado ${e.nombre} inactivo, no se muestra');
+            print('    ❌ Inactivo, no se muestra');
             return false;
           }
           
-          // 2. Filtrar por rol del usuario asociado
+          // Solo mostrar empleados agendables (si agendable es false, no mostrar)
+          if (e.agendable == false) {
+            print('    ❌ No agendable, no se muestra');
+            return false;
+          }
+          
+          print('    ✅ Se muestra');
+          
+          // Filtrar por rol del usuario asociado
           if (isAdmin) {
-            // Admins ven todos los empleados activos
             return true;
           } else if (isAsistente) {
-            // Asistentes solo ven a sí mismos
             if (widget.user?["usuarioId"] != null && e.usuarioId == widget.user?["usuarioId"]) {
               return true;
             }
             return false;
           } else if (isCliente) {
-            // Clientes ven todos los empleados activos
             return true;
           } else {
-            // Otros roles ven empleados activos
             return true;
           }
         })
         .toList();
     
     print('👤 Empleados activos: ${empleadosActivos.length} de ${empleados.length}');
-    print('   Empleados con horas confirmadas: ${empleadosConHoras.values.where((v) => v == true).length}');
-    print('   Empleados sin horas confirmadas: ${empleadosConHoras.values.where((v) => v == false).length}');
+    print('========================================');
     
-    // Inicializar lista filtrada con todos los empleados activos
     _empleadosFiltered = List.from(empleadosActivos);
-    
-    // También inicializar páginas filtradas
     _totalEmpleadoFilteredPages = (_empleadosFiltered.length / _itemsPerPage).ceil();
     if (_totalEmpleadoFilteredPages == 0) _totalEmpleadoFilteredPages = 1;
     _currentEmpleadoFilteredPage = 1;
@@ -412,9 +451,7 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
   }
 
   void _updateDisplayedServiciosFiltered() {
-    final start = (_currentServicePage - 1) * _itemsPerPage;
-    final end = (start + _itemsPerPage).clamp(0, _serviciosFiltered.length);
-    _displayedServicios = _serviciosFiltered.sublist(start, end);
+    _displayedServicios = List.from(_serviciosFiltered);
   }
 
   void _filterClientes(String query) {
@@ -506,7 +543,6 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
     setState(() {
       _empleadoSearchQuery = query.toLowerCase();
       
-      // Filtrar por búsqueda
       List<Empleado> resultado = empleados;
       
       if (_empleadoSearchQuery.isNotEmpty) {
@@ -517,7 +553,7 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
             .toList();
       }
       
-      // Filtrar por estado y rol (sin filtro de horarios)
+      // Filtrar por estado, agendable y rol
       _empleadosFiltered = resultado
           .where((e) {
             // 1. Solo mostrar empleados activos
@@ -525,21 +561,24 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
               return false;
             }
             
-            // 2. Filtrar por rol del usuario asociado
+            // 2. Solo mostrar empleados que son agendables (if agendable field is set)
+            // Si agendable es null, permitir (backward compatibility)
+            // Si agendable es false, filtrar (no mostrar)
+            if (e.agendable == false) {
+              return false;
+            }
+            
+            // 3. Filtrar por rol del usuario asociado
             if (isAdmin) {
-              // Admins ven todos los empleados activos
               return true;
             } else if (isAsistente) {
-              // Asistentes solo ven a sí mismos
               if (widget.user?["usuarioId"] != null && e.usuarioId == widget.user?["usuarioId"]) {
                 return true;
               }
               return false;
             } else if (isCliente) {
-              // Clientes ven todos los empleados activos
               return true;
             } else {
-              // Otros roles ven empleados activos
               return true;
             }
           })
@@ -2615,33 +2654,25 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
                         ),
                         onPressed: () {
                           print('========================================');
-                          print('👤 USUARIO CONFIRMA VER MIS CITAS');
+                          print('👤 USUARIO PRESIONA VER MI CITA');
                           print('========================================');
-                          print('Retornando a pantalla anterior...');
+                          print('Cerrando AppointmentFlowScreen para recarga...');
                           
-                          // Retornar con true para indicar que se agendó/reprogramó exitosamente
-                          Navigator.pop(context, true);
+                          // Solo cerrar el AppointmentFlowScreen
+                          // Return appropriate value based on if we're editing or creating new
+                          if (widget.agendaToEdit != null) {
+                            Navigator.pop(context, 'refresh');
+                          } else {
+                            Navigator.pop(context, true);
+                          }
                         },
                         child: const Text(
-                          "Ver mis citas",
+                          "Ver mi cita",
                           style: TextStyle(
                             fontSize: 16,
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
                           ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.popUntil(context, (route) => route.isFirst);
-                      },
-                      child: Text(
-                        "Ir al inicio",
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14,
                         ),
                       ),
                     ),
@@ -3135,6 +3166,7 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
         print('========================================');
         print('✅ CITA ENVIADA EXITOSAMENTE');
         print('========================================');
+        print('Agenda ID resultante: ${agendaResultado.agendaId}');
         
         // Calcular el índice del paso de confirmación
         final steps = _getSteps();
@@ -3161,6 +3193,7 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
                 curve: Curves.easeInOut,
               );
               print('✅ Animación exitosa');
+
             } catch (e) {
               print('❌ Error en animateToPage: $e');
               try {

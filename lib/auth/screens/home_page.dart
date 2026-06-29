@@ -125,8 +125,8 @@ class _HomePageState extends State<HomePage> {
                               ),
                             );
                             
-                            // Si se agendó exitosamente (result == true), navegar a mis citas
-                            if (result == true && mounted) {
+                            // Si se agendó exitosamente, navegar a mis citas
+                            if ((result == true || result == 'refresh' || result == 'reload') && mounted) {
                               // Incrementar key para forzar reconstrucción de MisCitasScreen
                               setState(() {
                                 _misCitasRefreshKey++;

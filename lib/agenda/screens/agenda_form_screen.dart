@@ -518,7 +518,8 @@ class _AgendaFormScreenState extends State<AgendaFormScreen> {
       }
 
       if (mounted) {
-        Navigator.pop(context, true);
+        // Retornar 'refresh' para que la pantalla anterior recargue el listado
+        Navigator.pop(context, 'refresh');
       }
     } catch (e) {
       if (mounted) {

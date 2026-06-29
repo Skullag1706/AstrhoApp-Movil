@@ -624,7 +624,8 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
 
   void _navigateToForm() async {
     final token = user?['token']?.toString();
-    final result = await Navigator.push(
+    print('🔷 Abriendo formulario de cita...');
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) =>
@@ -632,9 +633,9 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
       ),
     );
 
-    if (result == true) {
-      _loadAgendas();
-    }
+    print('🔷 Formulario cerrado. RECARGANDO LISTADO DE CITAS...');
+    // SIEMPRE recargar después de que se cierre el formulario
+    await _loadAgendas();
   }
 
   void _navigateToDetail(Agenda agenda) {
@@ -649,6 +650,10 @@ class _MisCitasScreenState extends State<MisCitasScreen> {
       // Si se retorna una agenda actualizada, recargar la lista
       if (result != null && result is Agenda) {
         print('📋 Cita actualizada, recargando listado...');
+        _loadAgendas(); // Recargar citas desde el servidor
+      } else if (result == 'refresh' || result == 'refresh_and_close') {
+        // Si retorna 'refresh' o 'refresh_and_close' significa que se reprogramó desde el detalle
+        print('📋 Cita reprogramada, recargando listado...');
         _loadAgendas(); // Recargar citas desde el servidor
       }
     });

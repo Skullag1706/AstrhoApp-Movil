@@ -70,14 +70,13 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         }
       } else {
         if (mounted) {
-          CustomAlert.showError(context, "Error al recuperar contraseña");
+          CustomAlert.showError(context, "Este cliente no esta registrado");
         }
       }
     } catch (e) {
       setState(() => loading = false);
       if (mounted) {
-        // Limpiar el mensaje de error para no mostrar códigos internos
-        String errorMessage = "Error de conexión";
+        String errorMessage = "Este cliente no esta registrado";
         if (e.toString().contains('500') || e.toString().contains('502')) {
           errorMessage = "Este servicio no se encuentra disponible actualmente";
         }
