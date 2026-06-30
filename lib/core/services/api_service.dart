@@ -1632,7 +1632,7 @@ class ApiService {
   }
 
   // Actualizar documento del usuario
-  Future<bool> updateUserDocument(int usuarioId, String documento, String email, int rolId, bool estado) async {
+  Future<bool> updateUserDocument(int usuarioId, String documento, String email, [int? rolId, bool? estado]) async {
     try {
       print('========================================');
       print('📝 ACTUALIZANDO DOCUMENTO DE USUARIO');
@@ -1643,12 +1643,16 @@ class ApiService {
       print('RolId: $rolId');
       print('Estado: $estado');
 
-      final jsonData = {
-        'rolId': rolId,
+      final jsonData = <String, dynamic>{
         'email': email,
-        'estado': estado,
         'documento': documento,
       };
+      if (rolId != null) {
+        jsonData['rolId'] = rolId;
+      }
+      if (estado != null) {
+        jsonData['estado'] = estado;
+      }
       print('📄 Payload: ${json.encode(jsonData)}');
       print('URL: $baseUrl/Usuarios/$usuarioId');
 

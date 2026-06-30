@@ -860,7 +860,7 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
                   
                   // Botones de acción (ocultos mientras se muestra el diálogo de éxito)
                   if (!_showingSuccessDialog && !_estaCancelado && !_estaCompletado) ...[
-                    if (!_isCliente && _estaPendiente) ...[
+                    if (!_isCliente && !_isAsistente && _estaPendiente) ...[
                       SizedBox(
                         width: double.infinity,
                         height: 50,
@@ -906,7 +906,7 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
                       ),
                       const SizedBox(height: 12),
                     ],
-                    if (_estaPendiente) ...[
+                    if (_estaPendiente && !_isAsistente) ...[
                       SizedBox(
                         width: double.infinity,
                         height: 50,

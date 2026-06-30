@@ -460,11 +460,19 @@ class _ProfilePageState extends State<ProfilePage> {
         print('Nuevo documento: ${_documentoController.text}');
         
         try {
-          // Obtener datos necesarios de usuarioData
+          // Obtener datos necesarios de usuarioData y widget.user
           print('usuarioData: $usuarioData');
+          print('usuarioData keys: ${usuarioData!.keys.toList()}');
+          print('widget.user: $widget.user');
+          print('widget.user keys: ${widget.user.keys.toList()}');
           final email = usuarioData!['email']?.toString() ?? '';
-          final rolId = usuarioData!['rolId'] ?? usuarioData!['rol_id'] ?? 2;
-          final estado = usuarioData!['estado'] ?? true;
+          // Preservar el rol original desde usuarioData (original del API de login)
+          // Si el usuario es super admin, empleado, etc., no cambiar el rolId
+          final originalRolId = usuarioData!['rolId'] ?? usuarioData!['rol_id'] ?? widget.user['rolId'] ?? widget.user['rol_id'];
+          final rolId = originalRolId ?? 2;
+          final estado = widget.user['estado'] ?? widget.user['activo'] ?? usuarioData!['estado'] ?? true;
+          print('Original RolId from usuarioData: ${usuarioData!['rolId']}, from widget.user: ${widget.user['rolId']}');
+          print('Using RolId: $rolId');
           
           print('Email extraído: $email');
           print('RolId extraído: $rolId');
@@ -475,13 +483,11 @@ class _ProfilePageState extends State<ProfilePage> {
             final apiService = ApiService(token: _authToken);
             print('Token para API: $_authToken');
             print('Llamando a updateUserDocument...');
-            
+            // NO enviar rolId ni estado para NO modificarlos
             final documentoActualizado = await apiService.updateUserDocument(
               usuarioId,
               _documentoController.text,
               email,
-              rolId is int ? rolId : (int.tryParse(rolId.toString()) ?? 2),
-              estado is bool ? estado : true,
             );
             
             print('Resultado de updateUserDocument: $documentoActualizado');
