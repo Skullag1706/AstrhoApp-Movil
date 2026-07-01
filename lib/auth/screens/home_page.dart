@@ -309,7 +309,19 @@ class _HomePageState extends State<HomePage> {
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
                   _buildHomeScreen(),
-                  const ServicesPage(showBottomNav: false),
+                  ServicesPage(
+                    showBottomNav: false,
+                    user: user,
+                    token: user?['token']?.toString(),
+                    onAppointmentBooked: () {
+                      // Same logic as when "Agendar Cita" button is pressed!
+                      setState(() {
+                        _misCitasRefreshKey++;
+                        _currentPageIndex = 2;
+                      });
+                      _pageController.jumpToPage(2);
+                    },
+                  ),
                   MisCitasScreen(
                     key: ValueKey(_misCitasRefreshKey),
                     user: user,

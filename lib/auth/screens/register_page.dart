@@ -309,6 +309,7 @@ class _RegisterPageState extends State<RegisterPage> {
     Function(String)? onChanged,
     bool isError = false,
     int maxLength = 100,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     Color borderColor = AppColors.borderLight;
     if (isError) {
@@ -331,6 +332,7 @@ class _RegisterPageState extends State<RegisterPage> {
               obscureText: isPassword ? !showPassword : false,
               inputFormatters: [
                 LengthLimitingTextInputFormatter(maxLength),
+                ...?inputFormatters,
               ],
               decoration: InputDecoration(
                 hintText: hint,
@@ -498,20 +500,22 @@ class _RegisterPageState extends State<RegisterPage> {
                                     margin: const EdgeInsets.symmetric(horizontal: 8),
                                   ),
                                 Expanded(
-                                  child: TextFormField(
-                                    controller: documentoCtrl,
-                                    inputFormatters: [
-                                      LengthLimitingTextInputFormatter(15),
-                                    ],
-                                    decoration: InputDecoration(
-                                      hintText: "Ingresa tu documento",
-                                      hintStyle: const TextStyle(color: AppColors.textGray),
-                                      border: InputBorder.none,
-                                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                                    ),
-                                    onChanged: (value) => setState(() => documentoError = validateDocumento(value)),
-                                  ),
-                                ),
+                child: TextFormField(
+                  controller: documentoCtrl,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    LengthLimitingTextInputFormatter(15),
+                    FilteringTextInputFormatter.digitsOnly,
+                  ],
+                  decoration: InputDecoration(
+                    hintText: "Ingresa tu documento",
+                    hintStyle: const TextStyle(color: AppColors.textGray),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  onChanged: (value) => setState(() => documentoError = validateDocumento(value)),
+                ),
+              ),
                               ],
                             ),
                           ),
@@ -536,6 +540,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             onChanged: (value) => setState(() => telefonoError = validateTelefono(value)),
                             isError: telefonoError != null,
                             maxLength: 10,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                           ),
                           const SizedBox(height: 16),
                           _buildLabel("Dirección", direccionError, isRequired: false),

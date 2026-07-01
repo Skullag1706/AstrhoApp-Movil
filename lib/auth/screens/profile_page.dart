@@ -818,6 +818,8 @@ class _ProfilePageState extends State<ProfilePage> {
                             enabled: isEditing,
                             maxLength: 15,
                             prefix: isEditing ? null : (_selectedDocumentType ?? 'CC'),
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                           ),
                           const SizedBox(height: 16),
                           _buildProfileField(
@@ -834,6 +836,8 @@ class _ProfilePageState extends State<ProfilePage> {
                             icon: Icons.phone,
                             enabled: isEditing,
                             maxLength: 10,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                           ),
                           const SizedBox(height: 16),
                           _buildProfileField(
@@ -988,6 +992,8 @@ class _ProfilePageState extends State<ProfilePage> {
     bool obscureText = false,
     int maxLength = 100,
     String? prefix,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1039,8 +1045,10 @@ class _ProfilePageState extends State<ProfilePage> {
                   controller: controller,
                   enabled: enabled,
                   obscureText: obscureText,
+                  keyboardType: keyboardType,
                   inputFormatters: [
                     LengthLimitingTextInputFormatter(maxLength),
+                    ...?inputFormatters,
                   ],
                   decoration: const InputDecoration(
                     border: InputBorder.none,

@@ -79,11 +79,26 @@ class MyApp extends StatelessWidget {
         '/assistant': (_) => AsistentePage(),
 
         // AGENDA
-        '/mis-citas': (_) => const MisCitasScreen(),
+        '/mis-citas': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments as Map<dynamic, dynamic>?;
+          return MisCitasScreen(
+            user: args,
+            token: args?['token']?.toString(),
+          );
+        },
         '/appointment-flow': (_) => const AppointmentFlowScreen(),
 
         // SERVICES
-        '/services': (_) => const ServicesPage(),
+        '/services': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments as Map<dynamic, dynamic>?;
+          return ServicesPage(
+            user: args,
+            token: args?['token']?.toString(),
+            onAppointmentBooked: () {
+              Navigator.pushReplacementNamed(context, '/mis-citas', arguments: args);
+            },
+          );
+        },
 
         // PERFIL
         '/profile': (_) => ProfilePage(user: const {}),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:astrhoapp/core/widgets/app_bottom_nav.dart';
 import 'package:astrhoapp/core/services/api_service.dart';
 import 'package:astrhoapp/agenda/models/agenda.dart';
+import 'package:astrhoapp/agenda/screens/appointment_flow_screen.dart';
 import 'package:astrhoapp/core/utils/colors.dart';
 
 // ─── COLORS ───────────────────────────────────────────────────────────────────
@@ -18,8 +19,11 @@ const kCategoryText = Color(0xFF8B2FC9);
 
 class ServicesPage extends StatefulWidget {
   final bool showBottomNav;
+  final Map<dynamic, dynamic>? user;
+  final String? token;
+  final Function()? onAppointmentBooked;
   
-  const ServicesPage({super.key, this.showBottomNav = true});
+  const ServicesPage({super.key, this.showBottomNav = true, this.user, this.token, this.onAppointmentBooked});
 
   @override
   State<ServicesPage> createState() => _ServicesPageState();
@@ -34,6 +38,8 @@ class _ServicesPageState extends State<ServicesPage> {
   bool isLoading = true;
   String? errorMessage;
   ApiService? apiService;
+  Map<dynamic, dynamic>? user;
+  String? token;
   
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -41,6 +47,8 @@ class _ServicesPageState extends State<ServicesPage> {
   @override
   void initState() {
     super.initState();
+    user = widget.user;
+    token = widget.token ?? user?['token']?.toString();
     apiService = ApiService();
     _loadServicesForPage(1);
     _searchController.addListener(_onSearchChanged);
@@ -321,7 +329,12 @@ class _ServicesPageState extends State<ServicesPage> {
               ),
               itemCount: displayedServices.length,
               itemBuilder: (context, index) {
-                return ServiceCard(service: displayedServices[index]);
+                return ServiceCard(
+                  service: displayedServices[index],
+                  user: user,
+                  token: token,
+                  onAppointmentBooked: widget.onAppointmentBooked,
+                );
               },
             ),
           ),
@@ -490,8 +503,11 @@ class _ServicesPageState extends State<ServicesPage> {
 // ─── SERVICE CARD ─────────────────────────────────────────────────────────────
 class ServiceCard extends StatelessWidget {
   final Servicio service;
+  final Map<dynamic, dynamic>? user;
+  final String? token;
+  final Function()? onAppointmentBooked;
 
-  const ServiceCard({super.key, required this.service});
+  const ServiceCard({super.key, required this.service, this.user, this.token, this.onAppointmentBooked});
 
   @override
   Widget build(BuildContext context) {
@@ -682,8 +698,20 @@ class ServiceCard extends StatelessWidget {
     );
   }
 
-  void _scheduleService(BuildContext context) {
-    Navigator.pushNamed(context, '/appointment-flow');
+  void _scheduleService(BuildContext context) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AppointmentFlowScreen(
+          user: user,
+          token: token,
+        ),
+      ),
+    );
+
+    if ((result == true || result == 'refresh' || result == 'reload') && onAppointmentBooked != null) {
+      onAppointmentBooked!();
+    }
   }
 
   void _openServiceDetail(BuildContext context) {
