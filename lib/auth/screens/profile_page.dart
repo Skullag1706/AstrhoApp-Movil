@@ -400,7 +400,7 @@ class _ProfilePageState extends State<ProfilePage> {
       
       if (rol == 'cliente' && clienteData != null) {
         final updateClienteData = {
-          'documentoCliente': clienteData!.documentoCliente, // Mantener PK sin cambios
+          'documentoCliente': _documentoController.text, // Actualizar documento
           'nombre': _nombreController.text,
           'telefono': _telefonoController.text,
           'direccion': _direccionController.text,
@@ -423,7 +423,7 @@ class _ProfilePageState extends State<ProfilePage> {
         }
       } else if (empleadoData != null) {
         final updateEmpleadoData = {
-          'documentoEmpleado': empleadoData!.documentoEmpleado, // Mantener PK sin cambios
+          'documentoEmpleado': _documentoController.text, // Actualizar documento
           'nombre': _nombreController.text,
           'telefono': _telefonoController.text,
           'direccion': _direccionController.text,
@@ -483,11 +483,13 @@ class _ProfilePageState extends State<ProfilePage> {
             final apiService = ApiService(token: _authToken);
             print('Token para API: $_authToken');
             print('Llamando a updateUserDocument...');
-            // NO enviar rolId ni estado para NO modificarlos
+            // Enviar el rolId y estado ORIGINALES para NO modificarlos
             final documentoActualizado = await apiService.updateUserDocument(
               usuarioId,
               _documentoController.text,
               email,
+              rolId,
+              estado,
             );
             
             print('Resultado de updateUserDocument: $documentoActualizado');
