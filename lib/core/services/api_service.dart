@@ -1631,8 +1631,35 @@ class ApiService {
     }
   }
 
+  // Obtener un usuario por ID
+  Future<Map<String, dynamic>?> getUsuarioById(int usuarioId) async {
+    try {
+      print('========================================');
+      print('🔍 OBTENIENDO USUARIO POR ID: $usuarioId');
+      print('========================================');
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/Usuarios/$usuarioId'),
+        headers: _headers,
+      ).timeout(timeoutDuration);
+      
+      print('Status code: ${response.statusCode}');
+      print('Response: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print('✅ Usuario obtenido correctamente');
+        return data is Map<String, dynamic> ? data : null;
+      }
+      return null;
+    } catch (e) {
+      print('❌ Error al obtener usuario: $e');
+      return null;
+    }
+  }
+
   // Actualizar documento del usuario
-  Future<bool> updateUserDocument(int usuarioId, String documento, String email, int rolId, bool estado) async {
+  Future<bool> updateUserDocument(int usuarioId, String documento, String email, [int? rolId, bool? estado]) async {
     try {
       print('========================================');
       print('📝 ACTUALIZANDO DOCUMENTO DE USUARIO');
@@ -1646,9 +1673,16 @@ class ApiService {
       final jsonData = <String, dynamic>{
         'email': email,
         'documento': documento,
-        'rolId': rolId,
-        'estado': estado,
       };
+      
+      // Solo agregar rolId y estado si los tenemos (para NO modificar lo que no queremos)
+      if (rolId != null) {
+        jsonData['rolId'] = rolId;
+      }
+      if (estado != null) {
+        jsonData['estado'] = estado;
+      }
+      
       print('📄 Payload: ${json.encode(jsonData)}');
       print('URL: $baseUrl/Usuarios/$usuarioId');
 

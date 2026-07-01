@@ -466,24 +466,103 @@ class _ProfilePageState extends State<ProfilePage> {
           print('widget.user: $widget.user');
           print('widget.user keys: ${widget.user.keys.toList()}');
           final email = usuarioData!['email']?.toString() ?? '';
-          // Preservar el rol original desde usuarioData (original del API de login)
-          // Si el usuario es super admin, empleado, etc., no cambiar el rolId
-          final originalRolId = usuarioData!['rolId'] ?? usuarioData!['rol_id'] ?? widget.user['rolId'] ?? widget.user['rol_id'];
-          final rolId = originalRolId ?? 2;
-          final estado = widget.user['estado'] ?? widget.user['activo'] ?? usuarioData!['estado'] ?? true;
-          print('Original RolId from usuarioData: ${usuarioData!['rolId']}, from widget.user: ${widget.user['rolId']}');
-          print('Using RolId: $rolId');
           
+          // 🎯 FORMA SEGURA: Obtener el usuario COMPLETO desde la API para usar su rolId y estado ORIGINALES
+          int? rolId;
+          bool? estado;
+          print('🔍 Obteniendo usuario completo desde la API para preservar rolId y estado...');
+          final apiService = ApiService(token: _authToken);
+          final usuarioCompleto = await apiService.getUsuarioById(usuarioId);
+          
+          if (usuarioCompleto != null) {
+            print('✅ Usuario completo obtenido: $usuarioCompleto');
+            // Buscar rolId en el usuario completo (todas las variantes)
+            usuarioCompleto.forEach((key, value) {
+              print('  Key: $key, Value: $value, Type: ${value.runtimeType}');
+            });
+            
+            // Primero buscar rolId directamente en el usuario
+            if (usuarioCompleto.containsKey('rolId') && usuarioCompleto['rolId'] != null) {
+              rolId = usuarioCompleto['rolId'] is int 
+                  ? usuarioCompleto['rolId'] 
+                  : int.tryParse(usuarioCompleto['rolId'].toString());
+              print('✅ Encontrado rolId en usuarioCompleto[\'rolId\']: $rolId');
+            } else if (usuarioCompleto.containsKey('rol_id') && usuarioCompleto['rol_id'] != null) {
+              rolId = usuarioCompleto['rol_id'] is int 
+                  ? usuarioCompleto['rol_id'] 
+                  : int.tryParse(usuarioCompleto['rol_id'].toString());
+              print('✅ Encontrado rolId en usuarioCompleto[\'rol_id\']: $rolId');
+            } else if (usuarioCompleto.containsKey('idRol') && usuarioCompleto['idRol'] != null) {
+              rolId = usuarioCompleto['idRol'] is int 
+                  ? usuarioCompleto['idRol'] 
+                  : int.tryParse(usuarioCompleto['idRol'].toString());
+              print('✅ Encontrado rolId en usuarioCompleto[\'idRol\']: $rolId');
+            } else if (usuarioCompleto.containsKey('id_rol') && usuarioCompleto['id_rol'] != null) {
+              rolId = usuarioCompleto['id_rol'] is int 
+                  ? usuarioCompleto['id_rol'] 
+                  : int.tryParse(usuarioCompleto['id_rol'].toString());
+              print('✅ Encontrado rolId en usuarioCompleto[\'id_rol\']: $rolId');
+            } 
+            // Si no, buscar dentro del objeto 'rol' (como lo muestra el log)
+            else if (usuarioCompleto.containsKey('rol') && usuarioCompleto['rol'] is Map) {
+              final rolObj = usuarioCompleto['rol'] as Map;
+              print('🔍 Buscando rolId dentro del objeto rol: $rolObj');
+              if (rolObj.containsKey('rolId') && rolObj['rolId'] != null) {
+                rolId = rolObj['rolId'] is int 
+                    ? rolObj['rolId'] 
+                    : int.tryParse(rolObj['rolId'].toString());
+                print('✅ Encontrado rolId en usuarioCompleto[\'rol\'][\'rolId\']: $rolId');
+              } else if (rolObj.containsKey('rol_id') && rolObj['rol_id'] != null) {
+                rolId = rolObj['rol_id'] is int 
+                    ? rolObj['rol_id'] 
+                    : int.tryParse(rolObj['rol_id'].toString());
+                print('✅ Encontrado rolId en usuarioCompleto[\'rol\'][\'rol_id\']: $rolId');
+              } else if (rolObj.containsKey('idRol') && rolObj['idRol'] != null) {
+                rolId = rolObj['idRol'] is int 
+                    ? rolObj['idRol'] 
+                    : int.tryParse(rolObj['idRol'].toString());
+                print('✅ Encontrado rolId en usuarioCompleto[\'rol\'][\'idRol\']: $rolId');
+              } else if (rolObj.containsKey('id_rol') && rolObj['id_rol'] != null) {
+                rolId = rolObj['id_rol'] is int 
+                    ? rolObj['id_rol'] 
+                    : int.tryParse(rolObj['id_rol'].toString());
+                print('✅ Encontrado rolId en usuarioCompleto[\'rol\'][\'id_rol\']: $rolId');
+              } else if (rolObj.containsKey('id') && rolObj['id'] != null) {
+                rolId = rolObj['id'] is int 
+                    ? rolObj['id'] 
+                    : int.tryParse(rolObj['id'].toString());
+                print('✅ Encontrado rolId en usuarioCompleto[\'rol\'][\'id\']: $rolId');
+              }
+            }
+            
+            // Buscar estado en el usuario completo
+            if (usuarioCompleto.containsKey('estado') && usuarioCompleto['estado'] != null) {
+              estado = usuarioCompleto['estado'] is bool 
+                  ? usuarioCompleto['estado'] 
+                  : usuarioCompleto['estado'].toString().toLowerCase() == 'true';
+              print('✅ Encontrado estado en usuarioCompleto[\'estado\']: $estado');
+            } else if (usuarioCompleto.containsKey('activo') && usuarioCompleto['activo'] != null) {
+              estado = usuarioCompleto['activo'] is bool 
+                  ? usuarioCompleto['activo'] 
+                  : usuarioCompleto['activo'].toString().toLowerCase() == 'true';
+              print('✅ Encontrado estado en usuarioCompleto[\'activo\']: $estado');
+            }
+          }
+          
+          // Si no obtuvimos el usuario completo, usar los datos que tenemos
+          if (estado == null) {
+            estado = widget.user['estado'] ?? widget.user['activo'] ?? usuarioData!['estado'] ?? true;
+          }
+          
+          print('RolId final: $rolId');
+          print('Estado final: $estado');
           print('Email extraído: $email');
-          print('RolId extraído: $rolId');
-          print('Estado extraído: $estado');
           
-          if (email.isNotEmpty) {
-            print('Creando ApiService con token...');
-            final apiService = ApiService(token: _authToken);
+          // Actualizar el documento (ahora con rolId y estado originales del usuario completo)
+          if (email.isNotEmpty && rolId != null && estado != null) {
             print('Token para API: $_authToken');
             print('Llamando a updateUserDocument...');
-            // Enviar el rolId y estado ORIGINALES para NO modificarlos
+            // Enviar el rolId y estado ORIGINALES que obtuvimos del usuario completo
             final documentoActualizado = await apiService.updateUserDocument(
               usuarioId,
               _documentoController.text,
@@ -500,7 +579,15 @@ class _ProfilePageState extends State<ProfilePage> {
               print('⚠️ No se pudo actualizar el documento de usuario');
             }
           } else {
-            print('⚠️ Email del usuario no disponible, no se actualiza documento');
+            if (email.isEmpty) {
+              print('⚠️ Email del usuario no disponible, no se actualiza documento');
+            }
+            if (rolId == null) {
+              print('⚠️ No se pudo obtener el rolId original, no se actualiza documento');
+            }
+            if (estado == null) {
+              print('⚠️ No se pudo obtener el estado original, no se actualiza documento');
+            }
           }
         } catch (e) {
           print('⚠️ Error al actualizar documento: $e');
