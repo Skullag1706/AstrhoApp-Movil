@@ -237,12 +237,17 @@ class ApiService {
   // Obtener una cita por ID
   Future<Agenda> getAgendaById(int id) async {
     try {
+      print('📞 getAgendaById called with id: $id');
       final response = await http
           .get(Uri.parse('$baseUrl/Agenda/$id'), headers: _headers)
           .timeout(timeoutDuration);
 
+      print('📞 getAgendaById status code: ${response.statusCode}');
+      print('📞 getAgendaById response body: ${response.body}');
+
       if (response.statusCode == 200) {
         final dynamic data = _parseJson(response.body);
+        print('📞 getAgendaById parsed data: $data');
         if (data is Map<String, dynamic>) {
           return Agenda.fromJson(data);
         } else {
@@ -252,6 +257,7 @@ class ApiService {
         throw Exception('Error al cargar la cita: ${response.statusCode}');
       }
     } catch (e) {
+      print('❌ getAgendaById error: $e');
       throw Exception('Error de conexión: $e');
     }
   }

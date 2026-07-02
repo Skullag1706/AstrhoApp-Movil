@@ -147,6 +147,32 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
 
   Future<void> _loadInitialData() async {
     try {
+      print('========================================');
+      print('📝 AppointmentFlowScreen opened!');
+      if (widget.agendaToEdit != null) {
+        print('✅ Rescheduling mode: widget.agendaToEdit is NOT null!');
+        final agenda = widget.agendaToEdit!;
+        print('  - agendaId: ${agenda.agendaId}');
+        print('  - documentoCliente: ${agenda.documentoCliente}');
+        print('  - documentoEmpleado: ${agenda.documentoEmpleado}');
+        print('  - fechaCita: ${agenda.fechaCita}');
+        print('  - horaInicio: ${agenda.horaInicio}');
+        print('  - nombreEstado: ${agenda.nombreEstado}');
+        print('  - nombreMetodoPago: ${agenda.nombreMetodoPago}');
+        print('  - metodopagoId: ${agenda.metodopagoId}');
+        print('  - servicios: ${agenda.servicios}');
+        if (agenda.servicios != null) {
+          print('  - servicios.length: ${agenda.servicios!.length}');
+          for (int i = 0; i < agenda.servicios!.length; i++) {
+            final s = agenda.servicios![i];
+            print('    - Servicio $i: servicioId=${s.servicioId}, nombre=${s.nombre}, duracion=${s.duracion}, precio=${s.precio}');
+          }
+        }
+      } else {
+        print('❌ Rescheduling mode: widget.agendaToEdit is NULL!');
+      }
+      print('========================================');
+
       // Cargar datos en paralelo
       final futures = <Future>[];
       futures.add(_apiService.getClientes().then((data) => clientes = data));
@@ -163,7 +189,16 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
       }));
       // Load ALL services from all pages (API has 5 records per page)
       futures.add(_loadAllServicios());
-      futures.add(_apiService.getMetodosPago().then((data) => metodosPago = data));
+      futures.add(_apiService.getMetodosPago().then((data) {
+        metodosPago = data;
+        print('========================================');
+        print('MÉTODOS DE PAGO CARGADOS:');
+        for (int i = 0; i < metodosPago.length; i++) {
+          final mp = metodosPago[i];
+          print('  - Método $i: metodopagoId=${mp.metodopagoId}, nombre=${mp.nombre}');
+        }
+        print('========================================');
+      }));
       
       // Cargar horarios de TODOS los empleados para verificar cuáles tienen horas
       futures.add(_loadEmpleadosHorariosInfo());
@@ -187,7 +222,16 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
           print('========================================');
         }),
         _loadAllServicios(),
-        _apiService.getMetodosPago().then((data) => metodosPago = data),
+        _apiService.getMetodosPago().then((data) {
+          metodosPago = data;
+          print('========================================');
+          print('MÉTODOS DE PAGO CARGADOS:');
+          for (int i = 0; i < metodosPago.length; i++) {
+            final mp = metodosPago[i];
+            print('  - Método $i: metodopagoId=${mp.metodopagoId}, nombre=${mp.nombre}');
+          }
+          print('========================================');
+        }),
       ]);
       
       // Cargar horarios de forma sincrónica ANTES de actualizar paginación
@@ -200,21 +244,6 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
         print('  - Servicio $i: ID=${s.servicioId}, Nombre=${s.nombre}, Duracion=${s.duracion}');
       }
       print('========================================');
-
-      // Preselect initial service if provided
-      if (widget.initialServiceId != null) {
-        serviciosSeleccionados.add(widget.initialServiceId!);
-        print('✅ Preselected service ID: ${widget.initialServiceId}');
-      }
-
-      // Initialize pagination DESPUÉS de que los horarios estén completamente cargados
-      if (mounted) {
-        setState(() {
-          _updatePaginationForClientes();
-          _updatePaginationForEmpleados();
-          _updatePaginationForServicios();
-        });
-      }
 
       // Si hay una cita para editar, prellenar los datos
       if (widget.agendaToEdit != null) {
@@ -234,26 +263,100 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
           );
         } catch (_) {}
 
-        // Prellenar servicios
+        // Prellenar servicios (filter out null IDs, and try name if ID fails)
+        print('👉 Preparing to select services from agenda.servicios...');
         if (agenda.servicios != null) {
-          serviciosSeleccionados = agenda.servicios!
-              .map((s) => s.servicioId)
-              .toSet();
+          final serviceIds = <int>{};
+          
+          for (final agendaService in agenda.servicios!) {
+            print('   - Checking agenda service: servicioId=${agendaService.servicioId}, nombre=${agendaService.nombre}');
+            
+            // First, try to find by ID
+            if (agendaService.servicioId != null && agendaService.servicioId != 0) {
+              final foundById = serviciosDisponibles.any((s) => s.servicioId == agendaService.servicioId);
+              if (foundById) {
+                serviceIds.add(agendaService.servicioId!);
+                print('      ✅ Found by ID (${agendaService.servicioId})');
+                continue;
+              }
+            }
+            
+            // If ID not found or invalid, try to find by name (case-insensitive, trim whitespace)
+            print('      ⚠️ ID not found, trying to match by name: "${agendaService.nombre}"');
+            final foundByName = serviciosDisponibles.where((s) => 
+              s.nombre.toLowerCase().trim() == agendaService.nombre.toLowerCase().trim()
+            );
+            
+            if (foundByName.isNotEmpty) {
+              serviceIds.add(foundByName.first.servicioId);
+              print('      ✅ Found by name: ${foundByName.first.nombre} (ID: ${foundByName.first.servicioId})');
+            } else {
+              print('      ❌ Could not find service by ID or name');
+            }
+          }
+          
+          serviciosSeleccionados = serviceIds;
+          print('✅ Final preselected services: $serviciosSeleccionados');
+        } else {
+          print('⚠️ agenda.servicios is NULL!');
         }
 
         // Prellenar método de pago
-        try {
-          if (agenda.metodopagoId != null) {
-            selectedMetodoPago = metodosPago.firstWhere(
-              (m) => m.metodopagoId == agenda.metodopagoId,
-            );
+        print('👉 Preparing to select payment method...');
+        print('   - agenda.metodopagoId: ${agenda.metodopagoId}');
+        print('   - agenda.nombreMetodoPago: ${agenda.nombreMetodoPago}');
+        print('   - metodosPago.length: ${metodosPago.length}');
+        if (metodosPago.isNotEmpty) {
+          selectedMetodoPago = null;
+          
+          // First try by ID
+          if (agenda.metodopagoId != null && agenda.metodopagoId != 0) {
+            try {
+              selectedMetodoPago = metodosPago.firstWhere(
+                (m) => m.metodopagoId == agenda.metodopagoId,
+              );
+              print('✅ Found payment method by ID: ${selectedMetodoPago?.nombre}');
+            } catch (e) {
+              print('⚠️ Could not find payment method by ID, trying name...');
+            }
           }
-        } catch (_) {}
+          
+          // If ID didn't work, try by name
+          if (selectedMetodoPago == null && agenda.nombreMetodoPago != null && agenda.nombreMetodoPago!.isNotEmpty) {
+            try {
+              selectedMetodoPago = metodosPago.firstWhere(
+                (m) => m.nombre.toLowerCase().trim() == agenda.nombreMetodoPago!.toLowerCase().trim(),
+              );
+              print('✅ Found payment method by name: ${selectedMetodoPago?.nombre}');
+            } catch (e) {
+              print('❌ Could not find payment method by name either: $e');
+            }
+          }
+        } else {
+          print('⚠️ No payment methods loaded!');
+        }
 
         // Prellenar fecha y hora
         selectedDate = agenda.fechaCita;
         selectedTime = agenda.horaInicio;
+        
+        // Call setState() to make sure all preselected fields are reflected in UI
+        if (mounted) {
+          setState(() {
+            print('🔄 Calling setState() after pre-populating reschedule fields!');
+            print('   - serviciosSeleccionados: $serviciosSeleccionados');
+            print('   - selectedMetodoPago: ${selectedMetodoPago?.nombre}');
+            print('   - selectedDate: $selectedDate');
+            print('   - selectedTime: $selectedTime');
+          });
+        }
       } else {
+        // Preselect initial service if provided
+        if (widget.initialServiceId != null) {
+          serviciosSeleccionados.add(widget.initialServiceId!);
+          print('✅ Preselected service ID: ${widget.initialServiceId}');
+        }
+
         // Asignar automáticamente según rol (solo si no estamos editando)
         if (isCliente) {
           final userId = widget.user?["usuarioId"];
@@ -282,6 +385,16 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
         if (metodosPago.isNotEmpty) {
           selectedMetodoPago = metodosPago.first;
         }
+      }
+
+      // Initialize pagination DESPUÉS de que los horarios estén completamente cargados
+      if (mounted) {
+        setState(() {
+          print('🔄 Calling setState() for pagination update!');
+          _updatePaginationForClientes();
+          _updatePaginationForEmpleados();
+          _updatePaginationForServicios();
+        });
       }
 
       // Cargar horarios iniciales si hay empleado seleccionado
@@ -1558,6 +1671,7 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
                       
                       final servicio = _displayedServicios[index];
                       final isSelected = serviciosSeleccionados.contains(servicio.servicioId);
+                      print('🔘 Building service item: ${servicio.nombre} (ID: ${servicio.servicioId}), isSelected: $isSelected, serviciosSeleccionados: $serviciosSeleccionados');
                       return GestureDetector(
                         onTap: () {
                           setState(() {
