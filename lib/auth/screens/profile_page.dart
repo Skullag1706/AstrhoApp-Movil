@@ -20,6 +20,14 @@ class _ProfilePageState extends State<ProfilePage> {
   bool isLoading = true;
   bool isEditing = false;
 
+  // Errors de validación
+  String? documentoError;
+  String? nombreError;
+  String? telefonoError;
+  String? direccionError;
+  String? nuevaContrasenaError;
+  String? confirmarContrasenaError;
+
   // Datos del usuario
   Map<String, dynamic>? usuarioData;
   Cliente? clienteData;
@@ -53,6 +61,62 @@ class _ProfilePageState extends State<ProfilePage> {
   // Tipo de documento
   String? _selectedDocumentType;
   final List<String> _documentTypes = ['CC', 'CE', 'TI', 'NIT'];
+
+  String? validateDocumento(String? value) {
+    if (value == null || value.isEmpty) return "Obligatorio";
+    if (value.length < 7) return "Mín 7 caracteres";
+    if (value.length > 10) return "Máx 10 caracteres";
+    return null;
+  }
+
+  String? validateNombre(String? value) {
+    if (value == null || value.isEmpty) return "Obligatorio";
+    if (value.length < 5) return "Mín 5 caracteres";
+    return null;
+  }
+
+  String? validateTelefono(String? value) {
+    if (value == null || value.isEmpty) return "Obligatorio";
+    if (value.length != 10) return "Debe ser 10 caracteres";
+    return null;
+  }
+
+  String? validateDireccion(String? value) {
+    if (value != null && value.isNotEmpty && value.length < 5) {
+      return "Mín 5 caracteres";
+    }
+    return null;
+  }
+
+  String? validateContrasena(String? value) {
+    if (value != null && value.isNotEmpty && value.length < 6) {
+      return "Mín 6 caracteres";
+    }
+    return null;
+  }
+
+  String? validateConfirmarContrasena(String? value) {
+    if (_passwordController.text.isNotEmpty) {
+      if (value == null || value.isEmpty) {
+        return "Obligatorio";
+      }
+      if (value != _passwordController.text) {
+        return "No coinciden";
+      }
+    }
+    return null;
+  }
+
+  void limpiarErrores() {
+    setState(() {
+      documentoError = null;
+      nombreError = null;
+      telefonoError = null;
+      direccionError = null;
+      nuevaContrasenaError = null;
+      confirmarContrasenaError = null;
+    });
+  }
 
   @override
   void initState() {
@@ -357,33 +421,27 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _saveProfile() async {
-    if (_nombreController.text.isEmpty) {
+    // Primero validar todos los campos
+    setState(() {
+      documentoError = validateDocumento(_documentoController.text);
+      nombreError = validateNombre(_nombreController.text);
+      telefonoError = validateTelefono(_telefonoController.text);
+      direccionError = validateDireccion(_direccionController.text);
+      nuevaContrasenaError = validateContrasena(_passwordController.text);
+      confirmarContrasenaError = validateConfirmarContrasena(_confirmPasswordController.text);
+    });
+
+    // Si hay errores, no continuar
+    if (documentoError != null ||
+        nombreError != null ||
+        telefonoError != null ||
+        direccionError != null ||
+        nuevaContrasenaError != null ||
+        confirmarContrasenaError != null) {
       if (mounted) {
-        CustomAlert.showError(context, 'El nombre es obligatorio');
+        CustomAlert.showError(context, 'Por favor corrige los errores antes de continuar');
       }
       return;
-    }
-
-    // Validar contraseñas si se proporcionaron
-    if (_passwordController.text.isNotEmpty || _confirmPasswordController.text.isNotEmpty) {
-      if (_passwordController.text.isEmpty) {
-        if (mounted) {
-          CustomAlert.showError(context, 'Debes ingresar la nueva contraseña');
-        }
-        return;
-      }
-      if (_confirmPasswordController.text.isEmpty) {
-        if (mounted) {
-          CustomAlert.showError(context, 'Debes confirmar la contraseña');
-        }
-        return;
-      }
-      if (_passwordController.text != _confirmPasswordController.text) {
-        if (mounted) {
-          CustomAlert.showError(context, 'Las contraseñas no coinciden');
-        }
-        return;
-      }
     }
 
     setState(() {
@@ -692,6 +750,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     _saveProfile();
                   } else {
                     isEditing = true;
+                    limpiarErrores();
                   }
                 });
               },
@@ -820,6 +879,12 @@ class _ProfilePageState extends State<ProfilePage> {
                             prefix: isEditing ? null : (_selectedDocumentType ?? 'CC'),
                             keyboardType: TextInputType.number,
                             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            error: documentoError,
+                            onChanged: (value) {
+                              setState(() {
+                                documentoError = validateDocumento(value);
+                              });
+                            },
                           ),
                           const SizedBox(height: 16),
                           _buildProfileField(
@@ -828,6 +893,12 @@ class _ProfilePageState extends State<ProfilePage> {
                             icon: Icons.person_outline,
                             enabled: isEditing,
                             maxLength: 100,
+                            error: nombreError,
+                            onChanged: (value) {
+                              setState(() {
+                                nombreError = validateNombre(value);
+                              });
+                            },
                           ),
                           const SizedBox(height: 16),
                           _buildProfileField(
@@ -838,6 +909,12 @@ class _ProfilePageState extends State<ProfilePage> {
                             maxLength: 10,
                             keyboardType: TextInputType.number,
                             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            error: telefonoError,
+                            onChanged: (value) {
+                              setState(() {
+                                telefonoError = validateTelefono(value);
+                              });
+                            },
                           ),
                           const SizedBox(height: 16),
                           _buildProfileField(
@@ -846,6 +923,12 @@ class _ProfilePageState extends State<ProfilePage> {
                             icon: Icons.location_on,
                             enabled: isEditing,
                             maxLength: 100,
+                            error: direccionError,
+                            onChanged: (value) {
+                              setState(() {
+                                direccionError = validateDireccion(value);
+                              });
+                            },
                           ),
                           const SizedBox(height: 16),
                           if (isEditing) ...[
@@ -856,6 +939,13 @@ class _ProfilePageState extends State<ProfilePage> {
                               enabled: true,
                               obscureText: !_showPassword,
                               maxLength: 50,
+                              error: nuevaContrasenaError,
+                              onChanged: (value) {
+                                setState(() {
+                                  nuevaContrasenaError = validateContrasena(value);
+                                  confirmarContrasenaError = validateConfirmarContrasena(_confirmPasswordController.text);
+                                });
+                              },
                             ),
                             const SizedBox(height: 4),
                             Align(
@@ -883,6 +973,12 @@ class _ProfilePageState extends State<ProfilePage> {
                               enabled: true,
                               obscureText: !_showConfirmPassword,
                               maxLength: 50,
+                              error: confirmarContrasenaError,
+                              onChanged: (value) {
+                                setState(() {
+                                  confirmarContrasenaError = validateConfirmarContrasena(value);
+                                });
+                              },
                             ),
                             const SizedBox(height: 4),
                             Align(
@@ -916,29 +1012,30 @@ class _ProfilePageState extends State<ProfilePage> {
                               children: [
                                 Expanded(
                                   child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.scaffoldBackground,
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                      elevation: 0,
-                                    ),
-                                    onPressed: () {
-                                      setState(() {
-                                        isEditing = false;
-                                        _loadProfileData();
-                                      });
-                                    },
-                                    child: const Text(
-                                      'Cancelar',
-                                      style: TextStyle(
-                                        color: AppColors.textDark,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.scaffoldBackground,
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
                                   ),
+                                  elevation: 0,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    isEditing = false;
+                                    limpiarErrores();
+                                    _loadProfileData();
+                                  });
+                                },
+                                child: const Text(
+                                  'Cancelar',
+                                  style: TextStyle(
+                                    color: AppColors.textDark,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
                                 ),
                                 const SizedBox(width: 16),
                                 Expanded(
@@ -994,23 +1091,43 @@ class _ProfilePageState extends State<ProfilePage> {
     String? prefix,
     TextInputType? keyboardType,
     List<TextInputFormatter>? inputFormatters,
+    String? error,
+    Function(String)? onChanged,
   }) {
+    Color borderColor = enabled ? AppColors.borderLight : AppColors.borderLight;
+    if (error != null) {
+      borderColor = Colors.red;
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            color: AppColors.primaryPurple,
-            fontWeight: FontWeight.w600,
-          ),
+        Row(
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.primaryPurple,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (error != null) ...[
+              const SizedBox(width: 10),
+              Text(
+                error,
+                style: const TextStyle(
+                  color: Colors.red,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ],
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
             border: Border.all(
-              color: enabled ? AppColors.borderLight : AppColors.borderLight,
+              color: borderColor,
               width: 1,
             ),
             borderRadius: BorderRadius.circular(16),
@@ -1019,7 +1136,7 @@ class _ProfilePageState extends State<ProfilePage> {
           child: Row(
             children: [
               const SizedBox(width: 12),
-              Icon(icon, color: AppColors.textGray),
+              Icon(icon, color: error != null ? Colors.red : AppColors.textGray),
               const SizedBox(width: 10),
               if (prefix != null && prefix.isNotEmpty)
                 Padding(
@@ -1054,6 +1171,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     border: InputBorder.none,
                     hintText: '',
                   ),
+                  onChanged: onChanged,
                 ),
               ),
               const SizedBox(width: 12),

@@ -80,16 +80,20 @@ class _RegisterPageState extends State<RegisterPage> {
 
   String? validateDocumento(String? value) {
     if (value == null || value.isEmpty) return "Obligatorio";
+    if (value.length < 7) return "Mín 7 caracteres";
+    if (value.length > 10) return "Máx 10 caracteres";
     return null;
   }
 
   String? validateNombreCliente(String? value) {
     if (value == null || value.isEmpty) return "Obligatorio";
+    if (value.length < 5) return "Mín 5 caracteres";
     return null;
   }
 
   String? validateTelefono(String? value) {
     if (value == null || value.isEmpty) return "Obligatorio";
+    if (value.length != 10) return "Debe ser 10 caracteres";
     return null;
   }
 
