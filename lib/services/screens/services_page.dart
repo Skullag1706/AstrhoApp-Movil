@@ -705,6 +705,7 @@ class ServiceCard extends StatelessWidget {
         builder: (context) => AppointmentFlowScreen(
           user: user,
           token: token,
+          initialServiceId: service.servicioId,
         ),
       ),
     );

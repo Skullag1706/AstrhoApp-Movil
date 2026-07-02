@@ -36,8 +36,9 @@ class AppointmentFlowScreen extends StatefulWidget {
   final String? token;
   final Map<dynamic, dynamic>? user;
   final bool showBackButton;
+  final int? initialServiceId;
 
-  const AppointmentFlowScreen({super.key, this.agenda, this.agendaToEdit, this.token, this.user, this.showBackButton = false});
+  const AppointmentFlowScreen({super.key, this.agenda, this.agendaToEdit, this.token, this.user, this.showBackButton = false, this.initialServiceId});
 
   @override
   State<AppointmentFlowScreen> createState() => _AppointmentFlowScreenState();
@@ -199,6 +200,12 @@ class _AppointmentFlowScreenState extends State<AppointmentFlowScreen> {
         print('  - Servicio $i: ID=${s.servicioId}, Nombre=${s.nombre}, Duracion=${s.duracion}');
       }
       print('========================================');
+
+      // Preselect initial service if provided
+      if (widget.initialServiceId != null) {
+        serviciosSeleccionados.add(widget.initialServiceId!);
+        print('✅ Preselected service ID: ${widget.initialServiceId}');
+      }
 
       // Initialize pagination DESPUÉS de que los horarios estén completamente cargados
       if (mounted) {
